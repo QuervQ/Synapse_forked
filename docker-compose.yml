@@ -1,0 +1,25 @@
+services:
+  browser-ui:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: browser-ui
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      - browser-network
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-tunnel-browser
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    restart: unless-stopped
+    networks:
+      - browser-network
+    depends_on:
+      - browser-ui
+
+networks:
+  browser-network:
+    driver: bridge

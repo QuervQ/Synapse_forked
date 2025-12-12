@@ -1,0 +1,15 @@
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.history
+.venv
+.env
+.env.local
+node_modules
+node_modules/
+src-tauri/target
+.DS_Store
+.env.production
