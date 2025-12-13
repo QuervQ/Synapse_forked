@@ -245,7 +245,7 @@ export default function RoomPage() {
 
             <div className="chat-container">
                 <div className="chat-header">
-                    <span>💬 {roomId}</span>
+                    <span><i className="fa-jelly fa-regular fa-comment-dots"></i> {roomId}</span>
                     <span className="online-count">👤 {onlineCount}人</span>
                 </div>
                 <div className="messages">

@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
-import { supabase } from '../lib/supabase';
+import { supabase, getSession } from '../lib/supabase';
 import ChatInterface from '../components/ChatInterface';
 import '../styles/HomePage.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
+import { createOrGetRoom } from '../lib/rooms';
 
 interface GoogleAppsIconProps {
     className?: string;
@@ -232,11 +233,16 @@ export default function GoogleStyleHome() {
     };
 
     const apps = [
-        { name: 'Chat', icon: '/images/icon.png' },
+        { name: 'Chat', icon: '/images/icon.png', action: () => setShowRoomModal(true) },
     ];
 
     const [language, setLanguage] = useState<'ja' | 'en' | 'ru' | 'es' | 'pt'>('ja');
     const [showLanguageMenu, setShowLanguageMenu] = useState(false);
+
+    // Create Room State
+    const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
+    const [newRoomName, setNewRoomName] = useState('');
+    const [isPrivate, setIsPrivate] = useState(false);
 
     const LANGUAGES = [
         { code: 'ja', label: '日本語', short: 'JP' },
@@ -249,6 +255,37 @@ export default function GoogleStyleHome() {
     const handleLanguageSelect = (code: typeof LANGUAGES[number]['code']) => {
         setLanguage(code);
         setShowLanguageMenu(false);
+    };
+
+    const handleCreateRoom = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const roomName = newRoomName.trim();
+        if (!roomName) return;
+
+        try {
+            const session = await getSession();
+            if (!session?.user) {
+                alert('ルームを作成するにはログインが必要です');
+                return;
+            }
+
+            const { data, error } = await createOrGetRoom(roomName, session.user.id, isPrivate);
+
+            if (error) {
+                console.error('Failed to create room:', error);
+                alert('ルームの作成に失敗しました (すでに存在する名前かもしれません)');
+                return;
+            }
+
+            // Success: navigate to the room
+            setSearchParams({ v: roomName });
+            setShowCreateRoomModal(false);
+            setNewRoomName('');
+            setIsPrivate(false);
+        } catch (err) {
+            console.error('Unexpected error creating room:', err);
+            alert('エラーが発生しました');
+        }
     };
 
     return (
@@ -313,7 +350,7 @@ export default function GoogleStyleHome() {
                         <div className="apps-dropdown" style={{ width: `${Math.min(apps.length, 3) * 80}px` }}>
                             <div className="apps-grid" style={{ gridTemplateColumns: `repeat(${Math.min(apps.length, 3)}, 1fr)` }}>
                                 {apps.map((app, index) => (
-                                    <div key={index} className="app-item" onClick={handleOpenRoomModal}>
+                                    <div key={index} className="app-item" onClick={app.action}>
                                         <div className="app-icon-wrapper">
                                             <img src={app.icon} alt={app.name} className="app-icon" />
                                         </div>
@@ -413,6 +450,48 @@ export default function GoogleStyleHome() {
                 </form>
             </main>
 
+            {/* Room Creation Modal */}
+            {showCreateRoomModal && (
+                <div className="modal-overlay" onClick={() => setShowCreateRoomModal(false)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3>ルームを作成</h3>
+                            <button className="close-button" onClick={() => setShowCreateRoomModal(false)}>×</button>
+                        </div>
+                        <form onSubmit={handleCreateRoom}>
+                            <div className="form-group">
+                                <label>ルーム名 (URLになります)</label>
+                                <input
+                                    type="text"
+                                    value={newRoomName}
+                                    onChange={(e) => setNewRoomName(e.target.value)}
+                                    placeholder="例: general, random, my-room"
+                                    className="modal-input"
+                                    pattern="[a-zA-Z0-9-_]+"
+                                    title="半角英数字、ハイフン、アンダースコアのみ使用可能です"
+                                    required
+                                />
+                            </div>
+                            <div className="form-group checkbox-group">
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        checked={isPrivate}
+                                        onChange={(e) => setIsPrivate(e.target.checked)}
+                                        className="room-private"
+                                    />
+                                    プライベートルームにする
+                                </label>
+                            </div>
+                            <div className="modal-actions">
+                                <button type="button" className="btn-modal-secondary" onClick={() => setShowCreateRoomModal(false)}>キャンセル</button>
+                                <button type="submit" className="btn-modal-primary">作成</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             {/* ルームモーダル */}
             {showRoomModal && (
                 <div className="modal-overlay" onClick={() => setShowRoomModal(false)}>
@@ -443,6 +522,19 @@ export default function GoogleStyleHome() {
                             このルームに参加
                         </button>
 
+                        <div className="create-room-section">
+                            <button
+                                className="btn-create-room"
+                                onClick={() => {
+                                    setShowRoomModal(false);
+                                    setShowCreateRoomModal(true);
+                                }}
+                            >
+                                <i className="fa-solid fa-plus"></i>
+                                新しいルームを作成する
+                            </button>
+                        </div>
+
                         <div className="modal-divider">
                             <span>ルーム一覧</span>
                         </div>
@@ -464,7 +556,7 @@ export default function GoogleStyleHome() {
                                         >
                                             <span className="room-name">{room.id}</span>
                                             <span className="room-count">
-                                                👤 {room.participant_count || 0}人
+                                                <i className="fa-solid fa-user"></i> {room.participant_count || 0}人
                                             </span>
                                         </button>
                                     ))}

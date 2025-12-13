@@ -557,8 +557,9 @@
 
 .btn-modal-secondary {
     width: 100%;
-    padding: 14px;
+    padding: 10px;
     font-size: 1em;
+    margin-bottom: 5px;
     font-weight: bold;
     background: #3a3a3a;
     color: white;
@@ -598,6 +599,34 @@
     margin-bottom: 12px;
 }
 
+.create-room-section {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #3a3a3a;
+    text-align: center;
+}
+
+.btn-create-room {
+    background: transparent;
+    border: 1px dashed #667eea;
+    color: #667eea;
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.95em;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    justify-content: center;
+}
+
+.btn-create-room:hover {
+    background: rgba(102, 126, 234, 0.1);
+    transform: translateY(-1px);
+}
+
 .room-list {
     display: flex;
     flex-direction: column;
@@ -633,6 +662,94 @@
 .room-count {
     color: #888;
     font-size: 0.9em;
+}
+
+.room-count {
+    color: #888;
+    font-size: 0.9em;
+}
+
+/* Create Room Modal Specific Styles */
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #fff;
+    font-size: 1.5em;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    color: #999;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.close-button:hover {
+    color: #fff;
+}
+
+.form-group {
+    margin-bottom: 24px;
+}
+
+.form-group label {
+    display: block;
+    color: #ddd;
+    margin-bottom: 8px;
+    font-weight: 500;
+    font-size: 0.95em;
+}
+
+.modal-input {
+    width: 100%;
+    padding: 14px 16px;
+    background: #1e1e1e;
+    border: 2px solid #3a3a3a;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 1em;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+.modal-input:focus {
+    border-color: #667eea;
+}
+
+.checkbox-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.room-private {
+    width: 18px;
+    height: 18px;
+    accent-color: #667eea;
+    cursor: pointer;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 32px;
+    justify-content: flex-end;
+}
+
+.modal-actions button {
+    width: auto;
+    padding: 10px 20px;
+    margin: 0;
 }
 
 @media (max-width: 768px) {

@@ -2,7 +2,8 @@ import { supabase } from './supabase';
 
 export interface Room {
     id: string;
-    name: string;
+    room_name: string;
+    is_private: boolean;
     created_by: string;
     created_at: string;
 }
@@ -19,17 +20,16 @@ export interface Participant {
 /**
  * ルームを作成または取得する
  */
-export const createOrGetRoom = async (roomId: string, userId: string) => {
+export const createOrGetRoom = async (roomName: string, userId: string, isPrivate: boolean = false) => {
     try {
-        // まず既存のルームを検索
+        // まず既存のルームを検索 (名前で検索)
         const { data: existingRoom, error: fetchError } = await supabase
             .from('rooms')
             .select('*')
-            .eq('id', roomId)
+            .eq('room_name', roomName)
             .maybeSingle();
 
         if (fetchError && fetchError.code !== 'PGRST116') {
-            // PGRST116は「レコードが見つからない」エラーなので無視
             console.error('Error fetching room:', fetchError);
             return { data: null, error: fetchError };
         }
@@ -40,13 +40,14 @@ export const createOrGetRoom = async (roomId: string, userId: string) => {
         }
 
         // 新しいルームを作成
+        // Note: is_private column needs to be added to the DB if not exists
         const { data: newRoom, error: createError } = await supabase
             .from('rooms')
             .insert([
                 {
-                    id: roomId,
-                    name: roomId,
-                    created_by: userId
+                    room_name: roomName,
+                    created_by: userId,
+                    is_private: isPrivate
                 }
             ])
             .select()
@@ -142,6 +143,7 @@ export const getRooms = async (limit: number = 10) => {
         const { data, error } = await supabase
             .from('rooms')
             .select('*')
+            .eq('is_private', false) // Only show public rooms
             .order('created_at', { ascending: false })
             .limit(limit);
 
