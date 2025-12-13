@@ -18,9 +18,9 @@ const GoogleAppsIcon: React.FC<GoogleAppsIconProps> = ({
     color = 'currentColor'
 }) => {
     return (
-        <svg
-            className={className}
-            focusable="false"
+    <svg
+        className={className}
+        focusable="false"
             viewBox="0 0 24 24"
             width={size}
             height={size}

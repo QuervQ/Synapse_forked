@@ -47,18 +47,14 @@
 }
 
 .chat-container {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    width: 350px;
-    height: 500px;
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    width: 380px;
+    flex-shrink: 0;
+    border-right: 1px solid #dfe1e5;
+    background: linear-gradient(45deg, #511177, #ae6cd2, #de6583, #ae2048);
+    height: 100%;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
-    backdrop-filter: blur(10px);
-    z-index: 2000;
 }
 
 .chat-header {

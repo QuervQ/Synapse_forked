@@ -839,3 +839,44 @@
 .dark-mode .btn-settings i {
     color: #9aa0a6;
 }
+
+/* Sidebar Layout Styles */
+.google-home-container.with-sidebar {
+    flex-direction: row;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.sidebar-chat {
+    width: 380px;
+    flex-shrink: 0;
+    border-right: 1px solid #dfe1e5;
+    background: #fff;
+    height: 100%;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.with-sidebar .google-home-main {
+    flex: 1;
+    margin-top: 0;
+    /* Align center naturally */
+    height: 100%;
+    overflow-y: auto;
+}
+
+/* Ensure the header stays on top right or adjusts in sidebar mode */
+.with-sidebar .google-home-header {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: auto;
+    z-index: 100;
+}
+
+/* Dark Mode Sidebar */
+.dark-mode .sidebar-chat {
+    background-color: #202124;
+    border-right: 1px solid #3c4043;
+}

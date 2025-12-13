@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
 import { supabase } from '../lib/supabase';
+import ChatInterface from '../components/ChatInterface';
 import '../styles/HomePage.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 
@@ -10,6 +11,14 @@ interface GoogleAppsIconProps {
     className?: string;
     size?: number;
     color?: string;
+}
+
+interface Room {
+    id: string;
+    name: string;
+    created_by: string;
+    created_at: string;
+    participant_count?: number;
 }
 
 const GoogleAppsIcon: React.FC<GoogleAppsIconProps> = ({
@@ -26,13 +35,15 @@ const GoogleAppsIcon: React.FC<GoogleAppsIconProps> = ({
             height={size}
             fill={color}
         >
-            <path d="M6,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM12,20c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM6,20c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM6,14c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM12,14c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM16,6c0,1.1 0.9,2 2,2s2,-0.9 2,-2 -0.9,-2 -2,-2 -2,0.9 -2,2zM12,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM18,14c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM18,20c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2z" />
+            <path d="M6,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM12,20c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM6,20c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM6,14c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM12,14c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM16,6c0,1.1 0.9,2 2,2s2,-0.9 2,-2 -0.9,-2 -2,-2 -2,0.9 -2,6zM12,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM18,14c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM18,20c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2z" />
         </svg>
     );
 };
 
 export default function GoogleStyleHome() {
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeRoomId = searchParams.get('v');
     const [searchQuery, setSearchQuery] = useState('');
     const [showApps, setShowApps] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -46,6 +57,8 @@ export default function GoogleStyleHome() {
     const [settingsName, setSettingsName] = useState('');
     const [settingsAvatarUrl, setSettingsAvatarUrl] = useState('');
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
+    const [rooms, setRooms] = useState<Room[]>([]);
+    const [loadingRooms, setLoadingRooms] = useState(false);
 
     const toggleTheme = () => {
         console.log('Toggling theme');
@@ -78,7 +91,7 @@ export default function GoogleStyleHome() {
         setSettingsName(displayName);
         setSettingsAvatarUrl(avatarUrl || '');
         setShowSettingsModal(true);
-        setShowProfileMenu(false); // Close menu
+        setShowProfileMenu(false);
     };
 
     const handleSaveSettings = async () => {
@@ -106,6 +119,45 @@ export default function GoogleStyleHome() {
         }
     };
 
+    const loadRooms = async () => {
+        setLoadingRooms(true);
+        try {
+            const { data, error } = await supabase
+                .from('rooms')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(10);
+
+            if (error) throw error;
+
+            // 各ルームの参加者数を取得
+            const roomsWithCount = await Promise.all(
+                (data || []).map(async (room) => {
+                    const { count } = await supabase
+                        .from('participants')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('room_id', room.id);
+
+                    return {
+                        ...room,
+                        participant_count: count || 0
+                    };
+                })
+            );
+
+            setRooms(roomsWithCount);
+        } catch (error) {
+            console.error('Failed to load rooms:', error);
+        } finally {
+            setLoadingRooms(false);
+        }
+    };
+
+    const handleOpenRoomModal = () => {
+        setShowRoomModal(true);
+        loadRooms();
+    };
+
     const handleJoinRoom = async () => {
         if (!session) {
             alert('ログインが必要です');
@@ -117,13 +169,15 @@ export default function GoogleStyleHome() {
         }
 
         const roomId = roomInput.trim();
-        const user = await getOrCreateUser(displayName, email);
+        // navigate(`/room/${roomId}`);
+        setSearchParams({ v: roomId });
+        setShowRoomModal(false);
+    };
 
-        await supabase.from('participants').insert([
-            { room_id: roomId, user_id: user.id, role: 'member' }
-        ]);
-
-        window.location.href = `/room/${roomId}`;
+    const handleJoinExistingRoom = (roomId: string) => {
+        // navigate(`/room/${roomId}`);
+        setSearchParams({ v: roomId });
+        setShowRoomModal(false);
     };
 
     const loadUserProfile = async (user: any) => {
@@ -139,7 +193,13 @@ export default function GoogleStyleHome() {
     };
 
     const handleGoogleSignIn = async () => {
-        await supabase.auth.signInWithOAuth({ provider: 'google' });
+        const redirectTo = window.location.origin; // 現在のオリジン（localhost）を取得
+        await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: redirectTo
+            }
+        });
     };
 
     const handleLogout = async () => {
@@ -167,7 +227,6 @@ export default function GoogleStyleHome() {
     const handleSearch = (e: React.FormEvent<HTMLFormElement>): void => {
         e.preventDefault();
         if (searchQuery.trim()) {
-            // 検索ページに遷移
             navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
         }
     };
@@ -193,7 +252,21 @@ export default function GoogleStyleHome() {
     };
 
     return (
-        <div className={`google-home-container ${theme === 'dark' ? 'dark-mode' : ''}`}>
+        <div className={`google-home-container ${theme === 'dark' ? 'dark-mode' : ''} ${activeRoomId ? 'with-sidebar' : ''}`}>
+
+            {/* Sidebar Chat Interface */}
+            {activeRoomId && (
+                <div className="sidebar-chat">
+                    <ChatInterface
+                        roomId={activeRoomId}
+                        onClose={() => {
+                            setSearchParams({});
+                            // Optional: navigate('/') if you want to clear params completely from history cleanly, 
+                            // but setSearchParams({}) is enough to remove 'v' param.
+                        }}
+                    />
+                </div>
+            )}
 
             {/* Header */}
             <header className="google-home-header">
@@ -203,7 +276,7 @@ export default function GoogleStyleHome() {
                     onClick={toggleTheme}
                     title={theme === 'light' ? 'ダークモードに切り替え' : 'ライトモードに切り替え'}
                 >
-                    <i className={`fa-solid ${theme === 'light' ? 'fa-moon' : 'fa-sun'}`}></i>
+                    <i className={`fa-solid ${theme === 'light' ? 'fa-moon' : 'fa-regular fa-moon'}`}></i>
                 </button>
 
                 <div className="language-menu-container">
@@ -240,7 +313,7 @@ export default function GoogleStyleHome() {
                         <div className="apps-dropdown" style={{ width: `${Math.min(apps.length, 3) * 80}px` }}>
                             <div className="apps-grid" style={{ gridTemplateColumns: `repeat(${Math.min(apps.length, 3)}, 1fr)` }}>
                                 {apps.map((app, index) => (
-                                    <div key={index} className="app-item" onClick={() => setShowRoomModal(true)}>
+                                    <div key={index} className="app-item" onClick={handleOpenRoomModal}>
                                         <div className="app-icon-wrapper">
                                             <img src={app.icon} alt={app.name} className="app-icon" />
                                         </div>
@@ -372,6 +445,31 @@ export default function GoogleStyleHome() {
 
                         <div className="modal-divider">
                             <span>ルーム一覧</span>
+                        </div>
+
+                        <div className="active-rooms">
+                            {loadingRooms ? (
+                                <p style={{ color: '#999', textAlign: 'center' }}>読み込み中...</p>
+                            ) : rooms.length === 0 ? (
+                                <p style={{ color: '#999', textAlign: 'center' }}>
+                                    まだルームがありません。<br />上記から新しいルームを作成してください。
+                                </p>
+                            ) : (
+                                <div className="room-list">
+                                    {rooms.map((room) => (
+                                        <button
+                                            key={room.id}
+                                            className="room-item"
+                                            onClick={() => handleJoinExistingRoom(room.id)}
+                                        >
+                                            <span className="room-name">{room.id}</span>
+                                            <span className="room-count">
+                                                👤 {room.participant_count || 0}人
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

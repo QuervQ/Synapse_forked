@@ -133,7 +133,7 @@ export default function RoomPage() {
                 updateCursors(state);
                 setOnlineCount(Object.keys(state).length);
             })
-            .on('presence', { event: 'leave' }, ({ key }) => {
+                .on('presence', { event: 'leave' }, ({ key }) => {
                 setCursors(prev => {
                     const newCursors = new Map(prev);
                     newCursors.delete(key);
