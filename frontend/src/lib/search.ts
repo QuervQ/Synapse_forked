@@ -64,12 +64,12 @@ export async function getSearchCache(searchWord: string): Promise<Search_cache[]
     try {
         
         // 2時間以内のキャッシュのみ取得              時間  分  秒
-        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+        const searchCacheLifetime = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
         const { data, error } = await supabase
             .from('search_results')
             .select('*')
             .eq('search_word', searchWord)
-            .gte('created_at', twoHoursAgo)
+            .gte('created_at', searchCacheLifetime)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
