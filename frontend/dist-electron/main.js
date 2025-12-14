@@ -21,12 +21,40 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       webviewTag: true,
-      webSecurity: true
+      // 🔧 開発時は webSecurity を無効化（WebView のスクリプト実行を許可）
+      webSecurity: !VITE_DEV_SERVER_URL
+      // 開発時は false、本番は true
     }
   });
   console.log(process.env.VITE_PUBLIC);
   win.webContents.on("did-finish-load", () => {
+    console.log("✅ Main window finished loading");
     win == null ? void 0 : win.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
+  });
+  win.webContents.on("did-attach-webview", (event, webContents) => {
+    console.log("📎 WebView attached!");
+    console.log("   - WebView ID:", webContents.id);
+    console.log("   - Can execute scripts:", true);
+    webContents.on("did-start-loading", () => {
+      console.log("🔄 [WebView] Started loading");
+    });
+    webContents.on("did-finish-load", () => {
+      console.log("✅ [WebView] Finished loading");
+    });
+    webContents.on("did-fail-load", (event2, errorCode, errorDescription) => {
+      console.error("❌ [WebView] Failed to load:", errorCode, errorDescription);
+    });
+    webContents.on("console-message", (event2, level, message, line, sourceId) => {
+      const levelStr = ["verbose", "info", "warning", "error"][level] || "log";
+      console.log(`[WebView ${levelStr.toUpperCase()}] ${message}`);
+      if (sourceId) {
+        console.log(`  at ${sourceId}:${line}`);
+      }
+    });
+    if (VITE_DEV_SERVER_URL) {
+      console.log("🔧 Opening WebView DevTools...");
+      webContents.openDevTools();
+    }
   });
   if (VITE_DEV_SERVER_URL) {
     console.log("Loading dev server:", VITE_DEV_SERVER_URL);

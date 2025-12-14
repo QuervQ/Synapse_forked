@@ -28,13 +28,51 @@ function createWindow() {
             contextIsolation: true,
             nodeIntegration: false,
             webviewTag: true,
-            webSecurity: true,
+            // 🔧 開発時は webSecurity を無効化（WebView のスクリプト実行を許可）
+            webSecurity: !VITE_DEV_SERVER_URL, // 開発時は false、本番は true
         },
     })
     console.log(process.env.VITE_PUBLIC)
+    
     // Test active push message to Renderer-process.
     win.webContents.on('did-finish-load', () => {
+        console.log('✅ Main window finished loading')
         win?.webContents.send('main-process-message', (new Date).toLocaleString())
+    })
+
+    // 🔧 WebView が attach されたときのログ出力とデバッグ設定
+    win.webContents.on('did-attach-webview', (event, webContents) => {
+        console.log('📎 WebView attached!')
+        console.log('   - WebView ID:', webContents.id)
+        console.log('   - Can execute scripts:', true)
+        
+        // WebView の読み込み状態をログ
+        webContents.on('did-start-loading', () => {
+            console.log('🔄 [WebView] Started loading')
+        })
+        
+        webContents.on('did-finish-load', () => {
+            console.log('✅ [WebView] Finished loading')
+        })
+        
+        webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+            console.error('❌ [WebView] Failed to load:', errorCode, errorDescription)
+        })
+        
+        // 🔧 WebView 内のコンソールログを親コンソールに転送（デバッグ用）
+        webContents.on('console-message', (event, level, message, line, sourceId) => {
+            const levelStr = ['verbose', 'info', 'warning', 'error'][level] || 'log'
+            console.log(`[WebView ${levelStr.toUpperCase()}] ${message}`)
+            if (sourceId) {
+                console.log(`  at ${sourceId}:${line}`)
+            }
+        })
+        
+        // 開発時は WebView の DevTools も開く
+        if (VITE_DEV_SERVER_URL) {
+            console.log('🔧 Opening WebView DevTools...')
+            webContents.openDevTools()
+        }
     })
 
     if (VITE_DEV_SERVER_URL) {

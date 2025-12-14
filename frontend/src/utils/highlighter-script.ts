@@ -7,8 +7,25 @@
 export function getHighlighterScript(): string {
     return `
 (function() {
-    if (window.__highlighterInstalled) return;
-    window.__highlighterInstalled = true;
+    console.log('🚀 [HIGHLIGHTER] Script execution started');
+    console.log('   - Document ready state:', document.readyState);
+    console.log('   - Body exists:', !!document.body);
+    
+    // 既に完全に初期化済みの場合は何もしない
+    if (window.__elementHighlighter && window.__elementHighlighter.initialized) {
+        console.log('⏭️ Highlighter already fully initialized, skipping');
+        return;
+    }
+
+    // 初期化中の場合も何もしない
+    if (window.__highlighterInstalling) {
+        console.log('⏭️ Highlighter installation in progress, skipping');
+        return;
+    }
+
+    // 初期化開始をマーク
+    window.__highlighterInstalling = true;
+    console.log('🚀 Starting highlighter installation');
 
     class ElementHighlighter {
         constructor() {
@@ -18,17 +35,61 @@ export function getHighlighterScript(): string {
             this.currentElement = null;
             this.detailHighlights = [];
             this.isMouseDown = false;
+            this.initialized = false; // 初期化完了フラグ
             this.init();
         }
 
         init() {
+            // body が存在するか確認
+            if (!document.body) {
+                console.warn('⚠️ [HIGHLIGHTER] document.body not ready, waiting...');
+                // DOMContentLoaded を待つ
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', () => {
+                        console.log('✅ [HIGHLIGHTER] DOMContentLoaded fired, initializing now...');
+                        this.init();
+                    });
+                    return;
+                } else {
+                    // readyState は interactive/complete だが body がない
+                    // 少し待ってから再試行
+                    setTimeout(() => {
+                        console.log('⏰ [HIGHLIGHTER] Retrying initialization...');
+                        this.init();
+                    }, 100);
+                    return;
+                }
+            }
+            
             this.createOverlay();
             this.createTooltip();
             this.injectStyles();
             this.attachEventListeners();
+            this.initialized = true; // 初期化完了
+            
+            // 初期化直後にテスト
+            console.log('✅ Highlighter initialization complete');
+            console.log('   - Overlay element:', this.overlay ? 'created' : 'MISSING');
+            console.log('   - Tooltip element:', this.tooltip ? 'created' : 'MISSING');
+            console.log('   - Overlay in DOM:', this.overlay && this.overlay.parentNode ? 'yes' : 'NO');
+            console.log('   - Current mode:', this.mode);
         }
 
         createOverlay() {
+            // Remove any existing overlay first
+            const existingOverlay = document.getElementById('element-highlighter-overlay');
+            if (existingOverlay) {
+                existingOverlay.remove();
+                console.log('🗑️ Removed existing overlay');
+            }
+            
+            // body が存在しない場合は待機
+            if (!document.body) {
+                console.error('❌ document.body not found! Waiting...');
+                setTimeout(() => this.createOverlay(), 100);
+                return;
+            }
+            
             this.overlay = document.createElement('div');
             this.overlay.id = 'element-highlighter-overlay';
             this.overlay.style.cssText = \`
@@ -40,10 +101,30 @@ export function getHighlighterScript(): string {
                             0 0 0 9999px rgba(66, 133, 244, 0.15);
                 outline: 1px solid rgba(66, 133, 244, 0.8);
             \`;
-            document.body.appendChild(this.overlay);
+            
+            try {
+                document.body.appendChild(this.overlay);
+                console.log('✅ Overlay created and appended to body');
+            } catch (error) {
+                console.error('❌ Failed to append overlay:', error);
+            }
         }
 
         createTooltip() {
+            // Remove any existing tooltip first
+            const existingTooltip = document.getElementById('element-highlighter-tooltip');
+            if (existingTooltip) {
+                existingTooltip.remove();
+                console.log('🗑️ Removed existing tooltip');
+            }
+            
+            // body が存在しない場合は待機
+            if (!document.body) {
+                console.error('❌ document.body not found for tooltip! Waiting...');
+                setTimeout(() => this.createTooltip(), 100);
+                return;
+            }
+            
             this.tooltip = document.createElement('div');
             this.tooltip.id = 'element-highlighter-tooltip';
             this.tooltip.style.cssText = \`
@@ -60,7 +141,13 @@ export function getHighlighterScript(): string {
                 white-space: nowrap;
                 box-shadow: 0 2px 8px rgba(0,0,0,0.3);
             \`;
-            document.body.appendChild(this.tooltip);
+            
+            try {
+                document.body.appendChild(this.tooltip);
+                console.log('✅ Tooltip created and appended to body');
+            } catch (error) {
+                console.error('❌ Failed to append tooltip:', error);
+            }
         }
 
         injectStyles() {
@@ -119,12 +206,19 @@ export function getHighlighterScript(): string {
         }
 
         attachEventListeners() {
-            // マウスムーブ（要素選択モード）
+            // マウスムーブ（要素選択モード） - キャプチャフェーズで確実に取得
             document.addEventListener('mousemove', (e) => {
                 if (this.mode === 'element') {
                     this.highlightElement(e);
                 }
-            });
+            }, true); // ← キャプチャフェーズを追加
+
+            // マウスオーバー（要素選択モード） - 追加の保険
+            document.addEventListener('mouseover', (e) => {
+                if (this.mode === 'element') {
+                    this.highlightElement(e);
+                }
+            }, true);
 
             // クリック防止（要素選択・詳細選択モード）
             document.addEventListener('click', (e) => {
@@ -136,12 +230,16 @@ export function getHighlighterScript(): string {
                     if (this.mode === 'element') {
                         this.selectElement(e.target);
                     }
+                    
+                    console.log('🚫 Click prevented in mode:', this.mode);
                 }
             }, true);
 
             // リンクとボタンの動作を完全に無効化
             document.addEventListener('mousedown', (e) => {
                 if (this.mode === 'element' || this.mode === 'detail') {
+                    console.log('🖱️ Mousedown detected in mode:', this.mode, 'on:', e.target.tagName);
+                    
                     // リンクやボタンの場合は動作を防止
                     const target = e.target;
                     if (target.tagName === 'A' || target.tagName === 'BUTTON' || 
@@ -149,6 +247,7 @@ export function getHighlighterScript(): string {
                         e.preventDefault();
                         e.stopPropagation();
                         e.stopImmediatePropagation();
+                        console.log('🚫 Link/button interaction prevented');
                     }
                 }
                 
@@ -156,7 +255,7 @@ export function getHighlighterScript(): string {
                     this.isMouseDown = true;
                     // 詳細選択モードでは既存のハイライトをクリアしない
                 }
-            });
+            }, true);
 
             // マウスアップ（詳細選択モード）
             document.addEventListener('mouseup', (e) => {
@@ -164,7 +263,7 @@ export function getHighlighterScript(): string {
                     this.isMouseDown = false;
                     setTimeout(() => this.highlightSelection(), 10);
                 }
-            });
+            }, true);
 
             // キーボードイベント（Enter / Esc）
             document.addEventListener('keydown', (e) => {
@@ -183,7 +282,7 @@ export function getHighlighterScript(): string {
                     this.setMode('off');
                     console.log('❌ ハイライトをクリアしました');
                 }
-            });
+            }, true);
 
             // スクロール時の追従
             document.addEventListener('scroll', () => {
@@ -218,11 +317,19 @@ export function getHighlighterScript(): string {
                     }
                 }, true);
             });
+            
+            console.log('✅ All event listeners attached with capture phase');
         }
 
         highlightElement(event) {
             const element = event.target;
             if (!element || element === this.overlay || element === this.tooltip) return;
+
+            // Ensure overlay exists in DOM
+            if (!this.overlay.parentNode) {
+                document.body.appendChild(this.overlay);
+                console.warn('⚠️ Overlay was detached, re-appending');
+            }
 
             this.currentElement = element;
             this.updateOverlayPosition(element);
@@ -232,10 +339,23 @@ export function getHighlighterScript(): string {
         updateOverlayPosition(element) {
             const rect = element.getBoundingClientRect();
             this.overlay.style.display = 'block';
-            this.overlay.style.left = rect.left + window.scrollX + 'px';
-            this.overlay.style.top = rect.top + window.scrollY + 'px';
+            // Fixed positioning uses viewport coordinates, no scroll offset needed
+            this.overlay.style.left = rect.left + 'px';
+            this.overlay.style.top = rect.top + 'px';
             this.overlay.style.width = rect.width + 'px';
             this.overlay.style.height = rect.height + 'px';
+            
+            // Debug logging (remove in production)
+            if (Math.random() < 0.01) { // Log 1% of calls to avoid spam
+                console.log('🔵 Overlay position:', {
+                    left: rect.left,
+                    top: rect.top,
+                    width: rect.width,
+                    height: rect.height,
+                    display: this.overlay.style.display,
+                    zIndex: this.overlay.style.zIndex
+                });
+            }
         }
 
         updateTooltip(element, event) {
@@ -449,6 +569,8 @@ export function getHighlighterScript(): string {
             const oldMode = this.mode;
             this.mode = newMode;
             
+            console.log(\`🎨 Mode changed from '\${oldMode}' to '\${newMode}'\`);
+            
             // モード終了時のみハイライトをクリア
             if (newMode === 'off' && oldMode !== 'off') {
                 // Escキー以外でモードを終了する場合はハイライトを保持
@@ -461,13 +583,16 @@ export function getHighlighterScript(): string {
                 this.overlay.style.display = 'none';
                 this.tooltip.style.display = 'none';
                 document.body.classList.add('element-mode-cursor');
+                console.log('✅ Element mode activated - hover over elements to highlight');
             } else if (this.mode === 'detail') {
                 this.overlay.style.display = 'none';
                 this.tooltip.style.display = 'none';
                 document.body.classList.add('detail-mode-cursor');
+                console.log('✅ Detail mode activated - select text or elements');
             } else {
                 this.overlay.style.display = 'none';
                 this.tooltip.style.display = 'none';
+                console.log('✅ Highlighter disabled');
             }
             
             this.showModeIndicator();
@@ -501,10 +626,46 @@ export function getHighlighterScript(): string {
         disable() {
             this.setMode('off');
         }
+        
+        // デバッグ用のテストメソッド
+        testOverlay() {
+            console.log('🧪 Testing overlay...');
+            console.log('   - Overlay element exists:', !!this.overlay);
+            console.log('   - Overlay in DOM:', !!(this.overlay && this.overlay.parentNode));
+            console.log('   - Overlay display:', this.overlay ? this.overlay.style.display : 'N/A');
+            console.log('   - Current mode:', this.mode);
+            
+            // 強制的にオーバーレイを画面中央に表示
+            if (this.overlay) {
+                this.overlay.style.display = 'block';
+                this.overlay.style.left = '100px';
+                this.overlay.style.top = '100px';
+                this.overlay.style.width = '200px';
+                this.overlay.style.height = '200px';
+                console.log('✅ Overlay forced to center of screen for 3 seconds');
+                
+                setTimeout(() => {
+                    this.overlay.style.display = 'none';
+                    console.log('✅ Test overlay hidden');
+                }, 3000);
+            } else {
+                console.error('❌ Overlay element does not exist!');
+            }
+        }
     }
 
-    window.__elementHighlighter = new ElementHighlighter();
-    console.log('🎨 Element Highlighter initialized!');
+    try {
+        window.__elementHighlighter = new ElementHighlighter();
+        window.__highlighterInstalling = false; // インストール完了
+        console.log('🎨 Element Highlighter initialized successfully!');
+        console.log('💡 Test overlay with: window.__elementHighlighter.testOverlay()');
+        console.log('💡 Check mode with: window.__elementHighlighter.mode');
+        console.log('💡 Highlighter object:', window.__elementHighlighter);
+    } catch (error) {
+        console.error('❌ Failed to initialize Element Highlighter:', error);
+        window.__highlighterInstalling = false;
+        throw error;
+    }
 })();
     `;
 }
