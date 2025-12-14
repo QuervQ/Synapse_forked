@@ -97,6 +97,13 @@ function BrowserPage() {
                     outline-offset: 1px !important;
                 }
                 
+                mark.text-selection-highlight {
+                    background-color: rgba(255, 235, 59, 0.5) !important;
+                    color: inherit !important;
+                    padding: 2px 0 !important;
+                    border-radius: 2px !important;
+                }
+                
                 .element-mode-cursor * {
                     cursor: crosshair !important;
                 }
@@ -238,17 +245,96 @@ function BrowserPage() {
             if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
 
             const range = selection.getRangeAt(0);
-            const selectedElements = this.getSelectedElements(range);
+            const selectedText = selection.toString();
             
-            selectedElements.forEach(el => {
-                if (el && el.nodeType === 1 && !el.classList.contains('detail-highlight')) {
-                    el.classList.add('detail-highlight');
-                    this.detailHighlights.push(el);
-                }
-            });
+            // テキストのみが選択されているかチェック
+            const isTextOnly = this.isTextOnlySelection(range);
+            
+            if (isTextOnly && selectedText.trim()) {
+                // テキストのみの場合：選択範囲を<mark>要素でラップ
+                this.highlightTextRange(range);
+                console.log('✨ Text highlighted:', selectedText.substring(0, 100));
+            } else {
+                // 要素選択の場合：従来通り要素全体をハイライト
+                const selectedElements = this.getSelectedElements(range);
+                selectedElements.forEach(el => {
+                    if (el && el.nodeType === 1 && !el.classList.contains('detail-highlight')) {
+                        el.classList.add('detail-highlight');
+                        this.detailHighlights.push(el);
+                    }
+                });
+                console.log('🎯 Highlighted elements:', selectedElements.length);
+            }
+        }
 
-            console.log('✨ Selected text:', selection.toString().substring(0, 100));
-            console.log('🎯 Highlighted elements:', selectedElements.length);
+        isTextOnlySelection(range) {
+            // 選択範囲がテキストノードのみを含むかチェック
+            const container = range.commonAncestorContainer;
+            
+            // テキストノード内の選択
+            if (container.nodeType === 3) {
+                return true;
+            }
+            
+            // 要素ノード内の選択をチェック
+            const fragment = range.cloneContents();
+            const walker = document.createTreeWalker(
+                fragment,
+                NodeFilter.SHOW_ALL,
+                null
+            );
+            
+            let hasElements = false;
+            let node;
+            while (node = walker.nextNode()) {
+                if (node.nodeType === 1 && node.nodeName !== 'BR') {
+                    hasElements = true;
+                    break;
+                }
+            }
+            
+            return !hasElements;
+        }
+
+        highlightTextRange(range) {
+            try {
+                // 既存の選択範囲を保存
+                const originalRange = range.cloneRange();
+                
+                // <mark>要素を作成
+                const mark = document.createElement('mark');
+                mark.className = 'text-selection-highlight';
+                mark.style.cssText = 'background-color: rgba(255, 235, 59, 0.5) !important; color: inherit !important;';
+                
+                // 選択範囲を<mark>でラップ
+                range.surroundContents(mark);
+                
+                // ハイライト要素を記録
+                this.detailHighlights.push(mark);
+                
+                // 選択を解除
+                window.getSelection().removeAllRanges();
+            } catch (e) {
+                // surroundContentsが失敗した場合（複数要素にまたがる場合など）
+                // より複雑な方法で処理
+                this.highlightComplexTextRange(range);
+            }
+        }
+
+        highlightComplexTextRange(range) {
+            try {
+                const fragment = range.extractContents();
+                const mark = document.createElement('mark');
+                mark.className = 'text-selection-highlight';
+                mark.style.cssText = 'background-color: rgba(255, 235, 59, 0.5) !important; color: inherit !important;';
+                mark.appendChild(fragment);
+                range.insertNode(mark);
+                
+                this.detailHighlights.push(mark);
+                window.getSelection().removeAllRanges();
+            } catch (e) {
+                console.error('Failed to highlight text:', e);
+            }
         }
 
         getSelectedElements(range) {
@@ -291,7 +377,22 @@ function BrowserPage() {
 
         clearDetailHighlights() {
             this.detailHighlights.forEach(el => {
-                if (el && el.classList) {
+                if (!el) return;
+                
+                // <mark>要素の場合は削除してコンテンツを戻す
+                if (el.tagName === 'MARK' && el.classList.contains('text-selection-highlight')) {
+                    const parent = el.parentNode;
+                    if (parent) {
+                        // <mark>の中身を親要素に戻す
+                        while (el.firstChild) {
+                            parent.insertBefore(el.firstChild, el);
+                        }
+                        parent.removeChild(el);
+                        // テキストノードを正規化
+                        parent.normalize();
+                    }
+                } else if (el.classList) {
+                    // 通常の要素ハイライトの場合はクラスを削除
                     el.classList.remove('detail-highlight');
                 }
             });
