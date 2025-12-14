@@ -145,13 +145,26 @@ export default function GoogleStyleHome() {
         }
 
         const roomId = roomInput.trim();
-        // navigate(`/room/${roomId}`);
+
+        const { data, error } = await createOrGetRoom(roomId, session.user.id);
+
+        if (error || !data) {
+            if ((error as any)?.code === 'ROOM_NOT_FOUND') {
+                alert('指定されたルームは存在しません');
+                return;
+            }
+
+            console.error('Failed to join or fetch room:', error);
+            alert('ルームの取得に失敗しました');
+            return;
+        }
+
+        setSearchParams({ v: data.room_name });
         setSearchParams({ v: roomId });
         setShowRoomModal(false);
     };
 
     const handleJoinExistingRoom = (roomName: string) => {
-        // navigate(`/room/${roomId}`);
         setSearchParams({ v: roomName });
         setShowRoomModal(false);
     };
@@ -263,7 +276,10 @@ export default function GoogleStyleHome() {
                 return;
             }
 
-            const { error } = await createOrGetRoom(roomName, session.user.id, isPrivate);
+            const { error } = await createOrGetRoom(roomName, session.user.id, {
+                isPrivate,
+                allowCreate: true,
+            });
 
             if (error) {
                 console.error('Failed to create room:', error);
@@ -271,7 +287,6 @@ export default function GoogleStyleHome() {
                 return;
             }
 
-            // Success: navigate to the room
             setSearchParams({ v: roomName });
             setShowCreateRoomModal(false);
             setNewRoomName('');

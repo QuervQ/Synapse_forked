@@ -192,7 +192,10 @@ export default function SearchPage() {
                 return;
             }
 
-            const { error } = await createOrGetRoom(roomName, session.user.id, isPrivate);
+            const { error } = await createOrGetRoom(roomName, session.user.id, {
+                isPrivate,
+                allowCreate: true,
+            });
 
             if (error) {
                 console.error('Failed to create room:', error);
