@@ -1,9 +1,9 @@
+import { supabase } from '../lib/supabase';
+import type { Search_cache } from '../types/search_cache';
+
 const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || '';
 const CX = import.meta.env.VITE_GOOGLE_CX || '';
 const BASE_URL = 'https://www.googleapis.com/customsearch/v1';
-// types
-import { supabase } from '../lib/supabase';
-import type { Search_cache } from '../types/search_cache';
 
 export interface SearchResult {
     title: string;
@@ -13,6 +13,7 @@ export interface SearchResult {
     htmlTitle?: string;
     htmlSnippet?: string;
     formattedUrl?: string;
+    favicon?: string;
 }
 
 export interface SearchResponse {
@@ -28,19 +29,15 @@ export interface SearchResponse {
 
 export interface SearchParams {
     query: string;
-    num?: number; // 取得件数（1-10）
-    start?: number; // 開始位置（ページネーション用）
+    num?: number; 
+    start?: number; 
 }
 
-// cache作成
-
-// キャッシュを保存
 export async function postSearchCache(
-    searchWord: string, 
+    searchWord: string,
     results: SearchResult[]
 ): Promise<void> {
     try {
-        // 検索結果を個別にINSERT
         const cacheData = results.map(result => ({
             search_word: searchWord,
             title: result.title,
@@ -59,11 +56,9 @@ export async function postSearchCache(
     }
 }
 
-// キャッシュを取得
 export async function getSearchCache(searchWord: string): Promise<Search_cache[] | null> {
     try {
-        
-        // 2時間以内のキャッシュのみ取得              時間  分  秒
+
         const searchCacheLifetime = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
         const { data, error } = await supabase
             .from('search_results')
@@ -73,7 +68,7 @@ export async function getSearchCache(searchWord: string): Promise<Search_cache[]
             .order('created_at', { ascending: false });
 
         if (error) throw error;
-        
+
         return data;
     } catch (error) {
         console.error('キャッシュ取得エラー:', error);
@@ -81,9 +76,6 @@ export async function getSearchCache(searchWord: string): Promise<Search_cache[]
     }
 }
 
-/**
- * Google Custom Search APIで検索を実行
- */
 export async function searchGoogle(params: SearchParams): Promise<SearchResponse> {
     const { query, num = 10, start = 1 } = params;
 
@@ -106,21 +98,23 @@ export async function searchGoogle(params: SearchParams): Promise<SearchResponse
     try {
         const cache_result = await getSearchCache(query);
         if (cache_result != null && cache_result.length > 0) {
-            // キャッシュが存在する場合はSearchResponse型に整形して返す
             return {
-                items: cache_result.map((c) => ({
-                    title: c.title,
-                    link: c.url,
-                    snippet: c.detail,
-                    displayLink: '', // 必要に応じて
-                })),
+                items: cache_result.map((c) => {
+                    const domain = new URL(c.url).hostname;
+                    return {
+                        title: c.title,
+                        link: c.url,
+                        snippet: c.detail,
+                        displayLink: domain,
+                        favicon: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`, // 追加
+                    };
+                }),
                 searchInformation: {
                     totalResults: cache_result.length.toString(),
                     searchTime: 0,
                 },
             };
         }
-        // cacheがない場合に通常の検索をできるようにする
         const response = await fetch(url.toString());
 
         if (!response.ok) {
@@ -129,18 +123,21 @@ export async function searchGoogle(params: SearchParams): Promise<SearchResponse
         }
         const data = await response.json();
 
-        // APIから取得した検索結果をキャッシュに保存
         if (data.items && Array.isArray(data.items)) {
-            // SearchResult[]型に変換
-            const results: SearchResult[] = data.items.map((item: any) => ({
-                title: item.title,
-                link: item.link,
-                snippet: item.snippet,
-                displayLink: item.displayLink || '',
-                htmlTitle: item.htmlTitle,
-                htmlSnippet: item.htmlSnippet,
-                formattedUrl: item.formattedUrl,
-            }));
+            const results: SearchResult[] = data.items.map((item: any) => {
+                const domain = item.displayLink || new URL(item.link).hostname;
+
+                return {
+                    title: item.title,
+                    link: item.link,
+                    snippet: item.snippet,
+                    displayLink: domain,
+                    htmlTitle: item.htmlTitle,
+                    htmlSnippet: item.htmlSnippet,
+                    formattedUrl: item.formattedUrl,
+                    favicon: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+                };
+            });
             await postSearchCache(query, results);
         }
 
@@ -153,16 +150,10 @@ export async function searchGoogle(params: SearchParams): Promise<SearchResponse
     }
 }
 
-/**
- * 次のページを取得するためのstartIndexを計算
- */
 export function getNextPageStart(currentStart: number, resultsPerPage: number): number {
     return currentStart + resultsPerPage;
 }
 
-/**
- * 前のページを取得するためのstartIndexを計算
- */
 export function getPrevPageStart(currentStart: number, resultsPerPage: number): number {
     return Math.max(1, currentStart - resultsPerPage);
 }

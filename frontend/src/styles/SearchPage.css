@@ -6,7 +6,7 @@
 }
 
 .search-page-header {
-    border-bottom: 1px solid #ebebeb;
+    border-bottom: 1px solid #202124;
     padding: 15px 20px;
     transition: padding 0.3s ease, font-size 0.3s ease;
 }
@@ -17,6 +17,23 @@
     display: flex;
     align-items: center;
     gap: 30px;
+    justify-content: center;
+}
+
+.result-url {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #5f6368;
+    margin-bottom: 4px;
+}
+
+.result-favicon {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    object-fit: cover;
 }
 
 .logo {
@@ -39,10 +56,10 @@
 .search-box-header {
     display: flex;
     align-items: center;
-    border: 1px solid #dfe1e5;
+    border: 1px solid #202124;
     border-radius: 24px;
     padding: 10px 15px;
-    background-color: #fff;
+    background-color: #202124;
 }
 
 .search-box-header:focus-within {
@@ -172,6 +189,148 @@
     }
 }
 
+/* Dark Mode Styles */
+.dark-mode.search-page-container {
+    background-color: #202124;
+    color: #e8eaed;
+}
+
+.dark-mode .search-page-header {
+    background-color: #202124;
+    border-bottom: 1px solid #3c4043;
+}
+
+.dark-mode .search-box-header {
+    background-color: #303134;
+    border-color: #5f6368;
+}
+
+.dark-mode .search-box-header:focus-within {
+    background-color: #303134;
+    border-color: #8ab4f8;
+}
+
+.dark-mode .search-input-header {
+    background-color: #303134;
+    color: #e8eaed;
+}
+
+.dark-mode .search-icon {
+    color: #9aa0a6;
+}
+
+.dark-mode .search-clear {
+    color: #9aa0a6;
+}
+
+.dark-mode .search-clear:hover {
+    color: #e8eaed;
+}
+
+.dark-mode .search-page-main {
+    background-color: #202124;
+}
+
+.dark-mode .loading {
+    color: #9aa0a6;
+}
+
+.dark-mode .error-message {
+    background-color: #5f2120;
+    color: #f28b82;
+}
+
+.dark-mode .results-info {
+    color: #9aa0a6;
+}
+
+.dark-mode .no-results {
+    color: #9aa0a6;
+}
+
+.dark-mode .result-url {
+    color: #bdc1c6;
+}
+
+.dark-mode .result-title a {
+    color: #8ab4f8;
+}
+
+.dark-mode .result-title a:visited {
+    color: #c58af9;
+}
+
+.dark-mode .result-title a:hover {
+    color: #aecbfa;
+}
+
+.dark-mode .result-snippet {
+    color: #bdc1c6;
+}
+
+.dark-mode .apps-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .apps-dropdown {
+    background: #292a2d;
+    border: 1px solid #3c4043;
+}
+
+.dark-mode .app-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .app-name {
+    color: #e8eaed;
+}
+
+.dark-mode .profile-button {
+    background: #3c4043;
+}
+
+.dark-mode .profile-button:hover {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .profile-initial {
+    color: #e8eaed;
+}
+
+.dark-mode .auth-dropdown {
+    background-color: #292a2d;
+    border: 1px solid #3c4043;
+}
+
+.dark-mode .profile-name {
+    color: #e8eaed;
+}
+
+.dark-mode .profile-email {
+    color: #9aa0a6;
+}
+
+.dark-mode .btn-settings,
+.dark-mode .btn-logout {
+    color: #e8eaed;
+}
+
+.dark-mode .btn-settings:hover,
+.dark-mode .btn-logout:hover {
+    background-color: #3c4043;
+}
+
+.dark-mode .login-button {
+    background: #8ab4f8;
+    color: #202124;
+    border-color: #8ab4f8;
+}
+
+.dark-mode .login-button:hover {
+    background: #aecbfa;
+    border-color: #aecbfa;
+}
+
 /* Sidebar Layout Styles */
 .search-page-container.with-sidebar {
     flex-direction: row;
@@ -179,11 +338,16 @@
     overflow: hidden;
 }
 
-.search-page-container.with-sidebar> :not(.sidebar-chat) {
+.search-content-wrapper {
     flex: 1;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-width: 0;
+}
+
+.with-sidebar .search-content-wrapper {
+    flex: 1;
 }
 
 .sidebar-chat {
@@ -201,8 +365,8 @@
     flex: 1;
     height: 100%;
     overflow-y: auto;
-    max-width: none;
-    padding: 10px 20px !important;
+    max-width: 100%;
+    padding: 10px 20px;
     margin: 0;
 }
 
@@ -210,14 +374,15 @@
     position: sticky;
     top: 0;
     z-index: 100;
-    background: #fff;
+    background: #202124;
     width: 100%;
     padding: 6px 12px;
-    border-bottom: 1px solid #ebebeb;
+    border-bottom: 1px solid #202124;
+    flex-shrink: 0;
 }
 
 .with-sidebar .header-content {
-    max-width: none;
+    max-width: 100%;
     width: 100%;
     gap: 10px;
 }

@@ -232,6 +232,10 @@
     align-items: center;
 }
 
+.btn-language:hover {
+    background-color: #f1f3f4;
+}
+
 .btn-theme-toggle {
     padding: 6px 0;
     width: 40px;
@@ -251,6 +255,10 @@
 
 .btn-theme-toggle i {
     color: #535975;
+}
+
+.btn-theme-toggle:hover {
+    background-color: #f1f3f4;
 }
 
 .btn-logout {
@@ -906,13 +914,13 @@
 }
 
 .dark-mode .language-item.active {
-    background-color: rgba(138, 180, 248, 0.24);
+    background-color: #202124;
     color: #8ab4f8;
 }
 
 .dark-mode .btn-language {
-    background-color: #303134;
-    border: 1px solid #5f6368;
+    background-color: #202124;
+    border: 1px solid #202124;
     color: #e8eaed;
 }
 
@@ -921,8 +929,8 @@
 }
 
 .dark-mode .btn-theme-toggle {
-    background-color: #303134;
-    border: 1px solid #5f6368;
+    background-color: #202124;
+    border: 1px solid #202124;
     color: #e8eaed;
 }
 
@@ -940,6 +948,10 @@
 
 .dark-mode .apps-button:hover {
     background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .apps-button svg {
+    color: #fff;
 }
 
 .dark-mode .profile-avatar-large {

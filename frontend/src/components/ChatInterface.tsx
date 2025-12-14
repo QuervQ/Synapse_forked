@@ -10,7 +10,7 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2'];
 
 interface Message {
-    id?: string; // Optional because we might not have it immediately for temp messages, though here we will always try to have it
+    id?: string;
     user: string;
     userId: string;
     text: string;
@@ -31,12 +31,10 @@ interface ChatInterfaceProps {
 
 export default function ChatInterface({ roomId, onClose }: ChatInterfaceProps) {
     const [username, setUsername] = useState('');
-    const [userId, setUserId] = useState('');
     const [currentRoomId, setCurrentRoomId] = useState('');
     const [messages, setMessages] = useState<Message[]>([]);
     const [messageInput, setMessageInput] = useState('');
     const [onlineCount, setOnlineCount] = useState(0);
-    const [cursors, setCursors] = useState<Map<string, CursorData>>(new Map());
     const [loading, setLoading] = useState(true);
     const [isCollapsed, setIsCollapsed] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -45,18 +43,26 @@ export default function ChatInterface({ roomId, onClose }: ChatInterfaceProps) {
     const myUserIdRef = useRef<string>('');
     const myColorRef = useRef<string>('');
     const supabaseRef = useRef<SupabaseClient | null>(null);
-    const currentRoomIdRef = useRef<string | null>(null); // Track for cleanup
+    const currentRoomIdRef = useRef<string | null>(null);
 
-    // Helper to add messages without duplicates
     const addMessages = (newMsgs: Message | Message[]) => {
         setMessages(prev => {
             const msgsToAdd = Array.isArray(newMsgs) ? newMsgs : [newMsgs];
-            const existingIds = new Set(prev.map(m => m.id));
-            const uniqueMsgs = msgsToAdd.filter(m => !m.id || !existingIds.has(m.id));
+            if (msgsToAdd.length === 0) return prev;
 
-            if (uniqueMsgs.length === 0) return prev;
+            const seenKeys = new Set(
+                prev.map(m => (m.id ? `id:${m.id}` : `tmp:${m.userId}-${m.timestamp}-${m.text}`))
+            );
 
-            return [...prev, ...uniqueMsgs].sort((a, b) => a.timestamp - b.timestamp);
+            const merged = [...prev];
+            msgsToAdd.forEach(msg => {
+                const key = msg.id ? `id:${msg.id}` : `tmp:${msg.userId}-${msg.timestamp}-${msg.text}`;
+                if (seenKeys.has(key)) return;
+                seenKeys.add(key);
+                merged.push(msg);
+            });
+
+            return merged.sort((a, b) => a.timestamp - b.timestamp);
         });
     };
 
@@ -77,13 +83,11 @@ export default function ChatInterface({ roomId, onClose }: ChatInterfaceProps) {
                 const displayName = words.map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
                 setUsername(displayName);
-                setUserId(session.user.id);
                 myUserIdRef.current = session.user.id;
                 myColorRef.current = colors[Math.floor(Math.random() * colors.length)];
 
                 if (!roomId) return;
 
-                // roomId prop is now treated as room_name from the URL
                 const { data: room, error: roomError } = await createOrGetRoom(roomId, session.user.id);
 
                 if (roomError || !room) {
@@ -93,26 +97,22 @@ export default function ChatInterface({ roomId, onClose }: ChatInterfaceProps) {
                     return;
                 }
 
-                // Use the DB ID for internal logic
                 const dbRoomId = room.id;
                 setCurrentRoomId(dbRoomId);
-                currentRoomIdRef.current = dbRoomId; // Update Ref for cleanup
-
+                currentRoomIdRef.current = dbRoomId; 
                 const { error: joinError } = await joinRoom(dbRoomId, session.user.id, displayName);
 
                 if (joinError) {
                     console.error('Join room failed:', joinError);
                 }
 
-                // Initialize supabase client for data fetching if not already available in scope
                 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
                 initializeSupabase(supabaseClient, dbRoomId);
 
-                // Fetch message history using the actual DB ID
                 const { data: history, error: historyError } = await supabaseClient
                     .from('messages')
                     .select('*')
-                    .eq('room_id', dbRoomId) // Use room.id (UUID), not roomId (Name)
+                    .eq('room_id', dbRoomId)
                     .order('created_at', { ascending: true });
 
                 if (!historyError && history) {
@@ -134,12 +134,11 @@ export default function ChatInterface({ roomId, onClose }: ChatInterfaceProps) {
             }
         };
 
-        setMessages([]); // Clear messages when switching rooms
+        setMessages([]);
         setLoading(true);
         initializeRoom();
 
         return () => {
-            // Use Refs for cleanup to avoid dependency loops
             if (currentRoomIdRef.current && myUserIdRef.current) {
                 leaveRoom(currentRoomIdRef.current, myUserIdRef.current);
             }
@@ -151,8 +150,6 @@ export default function ChatInterface({ roomId, onClose }: ChatInterfaceProps) {
                 chatChannelRef.current.unsubscribe();
             }
         };
-        // Removed username/userId/onClose from deps to prevent infinite loops
-        // roomId is the only trigger for room switching
     }, [roomId]);
 
     useEffect(() => {
@@ -163,7 +160,6 @@ export default function ChatInterface({ roomId, onClose }: ChatInterfaceProps) {
         const supabase = client || createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         supabaseRef.current = supabase;
 
-        // Use dbRoomId for channel name for consistency with UUID subscriptions
         const cursorChannel = supabase.channel(`cursor:${dbRoomId}`, {
             config: {
                 presence: {
@@ -178,12 +174,7 @@ export default function ChatInterface({ roomId, onClose }: ChatInterfaceProps) {
                 updateCursors(state);
                 setOnlineCount(Object.keys(state).length);
             })
-            .on('presence', { event: 'leave' }, ({ key }: { key: string }) => {
-                setCursors(prev => {
-                    const newCursors = new Map(prev);
-                    newCursors.delete(key);
-                    return newCursors;
-                });
+            .on('presence', { event: 'leave' }, () => {
             })
             .subscribe(async (status: 'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR') => {
                 if (status === 'SUBSCRIBED') {
@@ -198,8 +189,18 @@ export default function ChatInterface({ roomId, onClose }: ChatInterfaceProps) {
 
         cursorChannelRef.current = cursorChannel;
 
-        // DB Subscription for Chat
-        const chatChannel = supabase.channel(`chat:${dbRoomId}-db`)
+        const chatChannel = supabase.channel(`chat:${dbRoomId}`, {
+            config: {
+                broadcast: { ack: true },
+            },
+        });
+
+        chatChannel
+            .on('broadcast', { event: 'message' }, ({ payload }: { payload: Message }) => {
+                if (!payload) return;
+                if (payload.userId === myUserIdRef.current) return;
+                addMessages(payload);
+            })
             .on(
                 'postgres_changes',
                 {
@@ -208,8 +209,9 @@ export default function ChatInterface({ roomId, onClose }: ChatInterfaceProps) {
                     table: 'messages',
                     filter: `room_id=eq.${dbRoomId}`,
                 },
-                (payload: any) => { // Type payload properly if possible, or use any for now to fix lint
+                (payload: any) => {
                     const newMsg = payload.new;
+                    if (!newMsg) return;
                     const formattedMsg: Message = {
                         id: newMsg.id,
                         user: newMsg.user_name,
@@ -220,7 +222,10 @@ export default function ChatInterface({ roomId, onClose }: ChatInterfaceProps) {
                     addMessages(formattedMsg);
                 }
             )
-            .subscribe();
+            .subscribe(status => {
+                if (status === 'SUBSCRIBED') {
+                }
+            });
 
         chatChannelRef.current = chatChannel;
     };
@@ -238,22 +243,18 @@ export default function ChatInterface({ roomId, onClose }: ChatInterfaceProps) {
                 });
             }
         });
-        setCursors(newCursors);
     };
 
     const handleSendMessage = async () => {
         const message = messageInput.trim();
-        // Ensure we have the DB ID (currentRoomId) before sending
         if (!message || !supabaseRef.current || !currentRoomId) return;
 
-        // Clear input immediately for better feel
         setMessageInput('');
 
-        // Insert into DB and select return data to get ID and timestamp
         const { data, error } = await supabaseRef.current
             .from('messages')
             .insert({
-                room_id: currentRoomId, // Use the UUID, not the name
+                room_id: currentRoomId,
                 user_id: myUserIdRef.current,
                 user_name: username,
                 content: message,
@@ -264,7 +265,6 @@ export default function ChatInterface({ roomId, onClose }: ChatInterfaceProps) {
         if (error) {
             console.error('Error sending message:', error);
             alert('メッセージの送信に失敗しました');
-            // Restore input if failed (optional, but good UX)
             setMessageInput(message);
             return;
         }
@@ -278,6 +278,18 @@ export default function ChatInterface({ roomId, onClose }: ChatInterfaceProps) {
                 timestamp: new Date(data.created_at).getTime(),
             };
             addMessages(formattedMsg);
+
+            if (chatChannelRef.current) {
+                try {
+                    await chatChannelRef.current.send({
+                        type: 'broadcast',
+                        event: 'message',
+                        payload: formattedMsg,
+                    });
+                } catch (broadcastErr) {
+                    console.error('Broadcast failed:', broadcastErr);
+                }
+            }
         }
     };
 

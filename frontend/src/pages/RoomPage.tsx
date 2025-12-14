@@ -7,7 +7,6 @@ import '../styles/RoomPage.css';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
 const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2'];
 
 interface Message {
@@ -34,6 +33,7 @@ export default function RoomPage() {
     const [messageInput, setMessageInput] = useState('');
     const [onlineCount, setOnlineCount] = useState(0);
     const [cursors, setCursors] = useState<Map<string, CursorData>>(new Map());
+    const [displayName] = useState('');
     const [loading, setLoading] = useState(true);
     const supabaseRef = useRef<any>(null);
     const cursorChannelRef = useRef<RealtimeChannel | null>(null);
@@ -157,7 +157,14 @@ export default function RoomPage() {
 
         chatChannel
             .on('broadcast', { event: 'message' }, ({ payload }: { payload: Message }) => {
-                setMessages(prev => [...prev, payload]);
+                setMessages(prev => {
+                    const messageExists = prev.some(msg => 
+                        msg.userId === payload.userId && 
+                        msg.timestamp === payload.timestamp &&
+                        msg.text === payload.text
+                    );
+                    return messageExists ? prev : [...prev, payload];
+                });
             })
             .subscribe();
 
@@ -198,18 +205,25 @@ export default function RoomPage() {
         const message = messageInput.trim();
         if (!message || !chatChannelRef.current) return;
 
-        await chatChannelRef.current.send({
-            type: 'broadcast',
-            event: 'message',
-            payload: {
-                user: username,
-                userId: myUserIdRef.current,
-                text: message,
-                timestamp: Date.now(),
-            },
-        });
+        const newMessage = {
+            user: username,
+            userId: myUserIdRef.current,
+            text: message,
+            timestamp: Date.now(),
+        };
 
+        setMessages(prev => [...prev, newMessage]);
         setMessageInput('');
+
+        try {
+            await chatChannelRef.current.send({
+                type: 'broadcast',
+                event: 'message',
+                payload: newMessage,
+            });
+        } catch (error) {
+            console.error('Error sending message:', error);
+        }
     };
 
     const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -254,7 +268,7 @@ export default function RoomPage() {
                             key={index}
                             className={`message ${msg.userId === myUserIdRef.current ? 'own' : ''}`}
                         >
-                            <div className="message-user">{msg.user}</div>
+                            <div className="message-user">{displayName}</div>
                             <div className="message-text">{msg.text}</div>
                         </div>
                     ))}

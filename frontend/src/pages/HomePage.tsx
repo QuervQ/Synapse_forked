@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
+import { faMoon as faMoonRegular } from '@fortawesome/free-regular-svg-icons';
+import { faMoon as faMoonSolid } from '@fortawesome/free-solid-svg-icons';
 import { supabase, getSession } from '../lib/supabase';
 import ChatInterface from '../components/ChatInterface';
-import '../styles/HomePage.css';
-import '@fortawesome/fontawesome-free/css/all.min.css';
 import { createOrGetRoom } from '../lib/rooms';
+import '../styles/HomePage.css';
 
 interface GoogleAppsIconProps {
     className?: string;
@@ -61,8 +62,8 @@ export default function GoogleStyleHome() {
         const savedTheme = localStorage.getItem('theme');
         return (savedTheme === 'dark' || savedTheme === 'light') ? savedTheme : 'light';
     });
-    const [rooms, setRooms] = useState<Room[]>([]);
-    const [loadingRooms, setLoadingRooms] = useState(false);
+    const [rooms] = useState<Room[]>([]);
+    const [loadingRooms] = useState(false);
 
     const toggleTheme = () => {
         console.log('Toggling theme');
@@ -127,45 +128,6 @@ export default function GoogleStyleHome() {
         }
     };
 
-    const loadRooms = async () => {
-        setLoadingRooms(true);
-        try {
-            const { data, error } = await supabase
-                .from('rooms')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(10);
-
-            if (error) throw error;
-
-            // 各ルームの参加者数を取得
-            const roomsWithCount = await Promise.all(
-                (data || []).map(async (room) => {
-                    const { count } = await supabase
-                        .from('participants')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('room_id', room.id);
-
-                    return {
-                        ...room,
-                        participant_count: count || 0
-                    };
-                })
-            );
-
-            setRooms(roomsWithCount);
-        } catch (error) {
-            console.error('Failed to load rooms:', error);
-        } finally {
-            setLoadingRooms(false);
-        }
-    };
-
-    const handleOpenRoomModal = () => {
-        setShowRoomModal(true);
-        loadRooms();
-    };
-
     const handleJoinRoom = async () => {
         if (!session) {
             alert('ログインが必要です');
@@ -201,7 +163,7 @@ export default function GoogleStyleHome() {
     };
 
     const handleGoogleSignIn = async () => {
-        const redirectTo = window.location.origin; // 現在のオリジン（localhost）を取得
+        const redirectTo = window.location.origin;
         await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
@@ -217,25 +179,14 @@ export default function GoogleStyleHome() {
         setEmail('');
     };
 
-    const getOrCreateUser = async (name: string, email: string) => {
-        const { data: users, error: fetchError } = await supabase
-            .from('users')
-            .select()
-            .eq('email', email)
-            .maybeSingle();
-        if (users && !fetchError) return users;
-        const { data } = await supabase
-            .from('users')
-            .insert([{ display_name: name, email }])
-            .select()
-            .single();
-        return data;
-    };
-
     const handleSearch = (e: React.FormEvent<HTMLFormElement>): void => {
         e.preventDefault();
         if (searchQuery.trim()) {
-            navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+            const params = new URLSearchParams({ q: searchQuery.trim() });
+            if (activeRoomId) {
+                params.set('v', activeRoomId);
+            }
+            navigate(`/search?${params.toString()}`);
         }
     };
 
@@ -276,7 +227,7 @@ export default function GoogleStyleHome() {
                 return;
             }
 
-            const { data, error } = await createOrGetRoom(roomName, session.user.id, isPrivate);
+            const { error } = await createOrGetRoom(roomName, session.user.id, isPrivate);
 
             if (error) {
                 console.error('Failed to create room:', error);
@@ -284,7 +235,6 @@ export default function GoogleStyleHome() {
                 return;
             }
 
-            // Success: navigate to the room
             setSearchParams({ v: roomName });
             setShowCreateRoomModal(false);
             setNewRoomName('');
@@ -305,8 +255,6 @@ export default function GoogleStyleHome() {
                         roomId={activeRoomId}
                         onClose={() => {
                             setSearchParams({});
-                            // Optional: navigate('/') if you want to clear params completely from history cleanly, 
-                            // but setSearchParams({}) is enough to remove 'v' param.
                         }}
                     />
                 </div>
@@ -320,7 +268,7 @@ export default function GoogleStyleHome() {
                     onClick={toggleTheme}
                     title={theme === 'light' ? 'ダークモードに切り替え' : 'ライトモードに切り替え'}
                 >
-                    <i className={`fa-solid ${theme === 'light' ? 'fa-moon' : 'fa-regular fa-moon'}`}></i>
+                    <FontAwesomeIcon icon={theme === 'light' ? faMoonSolid : faMoonRegular} />
                 </button>
 
                 <div className="language-menu-container">

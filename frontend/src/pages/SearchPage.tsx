@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
+import { faMagnifyingGlass, faGear, faRightFromBracket} from '@fortawesome/free-solid-svg-icons';
 import { searchGoogle, SearchResult } from '../lib/search';
 import { supabase } from '../lib/supabase';
 import ChatInterface from '../components/ChatInterface';
@@ -52,10 +52,58 @@ export default function SearchPage() {
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [settingsName, setSettingsName] = useState('');
     const [settingsAvatarUrl, setSettingsAvatarUrl] = useState('');
-    const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const [theme] = useState<'light' | 'dark'>(() => {
         const savedTheme = localStorage.getItem('theme');
         return (savedTheme === 'dark' || savedTheme === 'light') ? savedTheme : 'light';
     });
+    const query = searchParams.get('q');
+    const [currentPage, setCurrentPage] = useState(1);
+    const resultsPerPage = 10;
+
+    useEffect(() => {
+        const query = searchParams.get('q');
+        const page = parseInt(searchParams.get('page') || '1');
+
+        if (query) {
+            setSearchQuery(query);
+            setCurrentPage(page);
+            performSearch(query, page);
+        }
+    }, [searchParams]);
+
+    const handlePageChange = (page: number) => {
+        const params: Record<string, string> = {
+            q: searchQuery,
+            page: page.toString()
+        };
+        if (activeRoomId) {
+            params.v = activeRoomId;
+        }
+        setSearchParams(params);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const totalPages = Math.min(Math.ceil(parseInt(totalResults) / resultsPerPage), 10); // Googleは最大10ページ
+
+    useEffect(() => {
+        document.title = query ? `${query} - Synapse Search` : 'Synapse Search';
+
+        let metaDescription = document.querySelector('meta[name="description"]');
+        if (!metaDescription) {
+            metaDescription = document.createElement('meta');
+            metaDescription.setAttribute('name', 'description');
+            document.head.appendChild(metaDescription);
+        }
+        metaDescription.setAttribute('content', `${query}の検索結果`);
+
+        let ogTitle = document.querySelector('meta[property="og:title"]');
+        if (!ogTitle) {
+            ogTitle = document.createElement('meta');
+            ogTitle.setAttribute('property', 'og:title');
+            document.head.appendChild(ogTitle);
+        }
+        ogTitle.setAttribute('content', `${query} - Synapse検索`);
+    }, [query]);
 
     useEffect(() => {
         const query = searchParams.get('q');
@@ -113,17 +161,18 @@ export default function SearchPage() {
         }
     };
 
-    const performSearch = async (query: string) => {
+    const performSearch = async (query: string, page: number = 1) => {
         if (!query.trim()) return;
 
         setLoading(true);
         setError(null);
 
         try {
+            const startIndex = (page - 1) * resultsPerPage + 1;
             const data = await searchGoogle({
                 query,
-                num: 10,
-                start: 1
+                num: resultsPerPage,
+                start: startIndex
             });
 
             setResults(data.items || []);
@@ -193,7 +242,6 @@ export default function SearchPage() {
         const userName =
             user.user_metadata?.full_name ||
             user.user_metadata?.name ||
-            user.email?.split('@')[0] ||
             'No Name';
 
         setDisplayName(userName);
@@ -235,196 +283,244 @@ export default function SearchPage() {
                 </div>
             )}
 
-            {/* ヘッダー */}
-            <header className="search-page-header">
-                <div className="header-content">
-                    <h1 className="logo" onClick={handleBackToHome} style={{ cursor: 'pointer' }}>
-                        Synapse
-                    </h1>
+            {/* Main Content Wrapper */}
+            <div className="search-content-wrapper">
+                {/* ヘッダー */}
+                <header className="search-page-header">
+                    <div className="header-content">
+                        <h1 className="logo" onClick={handleBackToHome} style={{ cursor: 'pointer' }}>
+                            Synapse
+                        </h1>
 
-                    <form onSubmit={handleSearch} className="search-form-header">
-                        <div className="search-box-header">
-                            <span className="search-icon">
-                                <FontAwesomeIcon icon={faMagnifyingGlass} />
-                            </span>
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Search"
-                                className="search-input-header"
-                            />
-                            {searchQuery && (
-                                <button
-                                    type="button"
-                                    onClick={() => setSearchQuery('')}
-                                    className="search-clear"
-                                >
-                                    ×
-                                </button>
-                            )}
-                        </div>
-                    </form>
-
-                    {/* Apps Icon */}
-                    <button className="apps-button" onClick={() => { setShowProfileMenu(false); setShowApps(!showApps); }}>
-                        <GoogleAppsIcon />
-                        {/* Apps Dropdown */}
-                        {showApps && (
-                            <div className="apps-dropdown" style={{ width: `${Math.min(apps.length, 3) * 80}px` }}>
-                                <div className="apps-grid" style={{ gridTemplateColumns: `repeat(${Math.min(apps.length, 3)}, 1fr)` }}>
-                                    {apps.map((app, index) => (
-                                        <div key={index} className="app-item" onClick={app.action}>
-                                            <div className="app-icon-wrapper">
-                                                <img src={app.icon} alt={app.name} className="app-icon" />
-                                            </div>
-                                            <span className="app-name">{app.name}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </button>
-
-                    {/* Profile */}
-                    {displayName ? (
-                        <button
-                            className="profile-button"
-                            onClick={() => {
-                                setShowApps(false);
-                                setShowProfileMenu(!showProfileMenu);
-                            }}
-                            onBlur={() => setTimeout(() => setShowProfileMenu(false), 200)}
-                        >
-                            {avatarUrl ? (
-                                <img src={avatarUrl} alt="avatar" className="profile-avatar" />
-                            ) : (
-                                <span className="profile-initial">
-                                    {displayName[0]?.toUpperCase()}
+                        <form onSubmit={handleSearch} className="search-form-header">
+                            <div className="search-box-header">
+                                <span className="search-icon">
+                                    <FontAwesomeIcon icon={faMagnifyingGlass} />
                                 </span>
-                            )}
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Search"
+                                    className="search-input-header"
+                                />
+                                {searchQuery && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearchQuery('')}
+                                        className="search-clear"
+                                    >
+                                        ×
+                                    </button>
+                                )}
+                            </div>
+                        </form>
 
-                            {/* プロフィールメニュー */}
-                            {showProfileMenu && (
-                                <div
-                                    className="auth-dropdown"
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <div className="profile-header">
-                                        <div className="profile-avatar-large">
-                                            {avatarUrl ? (
-                                                <img src={avatarUrl} alt="avatar" className="profile-avatar" />
-                                            ) : (
-                                                <span className="profile-initial">
-                                                    {displayName[0]?.toUpperCase()}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="profile-name">{displayName}</div>
-                                        <div className="profile-email">{session?.user?.email}</div>
-                                    </div>
-                                    <div className="profile-actions">
-                                        <button
-                                            onClick={handleOpenSettings}
-                                            className="btn-settings">
-                                            <i className="fa-solid fa-gear"></i> 設定
-                                        </button>
-                                        <button
-                                            onClick={handleLogout}
-                                            className="btn-logout">
-                                            <i className="fa-solid fa-right-from-bracket"></i> ログアウト
-                                        </button>
+                        {/* Apps Icon */}
+                        <button className="apps-button" onClick={() => { setShowProfileMenu(false); setShowApps(!showApps); }}>
+                            <GoogleAppsIcon />
+                            {/* Apps Dropdown */}
+                            {showApps && (
+                                <div className="apps-dropdown" style={{ width: `${Math.min(apps.length, 3) * 80}px` }}>
+                                    <div className="apps-grid" style={{ gridTemplateColumns: `repeat(${Math.min(apps.length, 3)}, 1fr)` }}>
+                                        {apps.map((app, index) => (
+                                            <div key={index} className="app-item" onClick={app.action}>
+                                                <div className="app-icon-wrapper">
+                                                    <img src={app.icon} alt={app.name} className="app-icon" />
+                                                </div>
+                                                <span className="app-name">{app.name}</span>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             )}
                         </button>
-                    ) : (
-                        <button className="login-button" onClick={handleGoogleSignIn}>
-                            ログイン
-                        </button>
+
+                        {/* Profile */}
+                        {displayName ? (
+                            <button
+                                className="profile-button"
+                                onClick={() => {
+                                    setShowApps(false);
+                                    setShowProfileMenu(!showProfileMenu);
+                                }}
+                                onBlur={() => setTimeout(() => setShowProfileMenu(false), 200)}
+                            >
+                                {avatarUrl ? (
+                                    <img src={avatarUrl} alt="avatar" className="profile-avatar" />
+                                ) : (
+                                    <span className="profile-initial">
+                                        {displayName[0]?.toUpperCase()}
+                                    </span>
+                                )}
+
+                                {/* プロフィールメニュー */}
+                                {showProfileMenu && (
+                                    <div
+                                        className="auth-dropdown"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <div className="profile-header">
+                                            <div className="profile-avatar-large">
+                                                {avatarUrl ? (
+                                                    <img src={avatarUrl} alt="avatar" className="profile-avatar" />
+                                                ) : (
+                                                    <span className="profile-initial">
+                                                        {displayName[0]?.toUpperCase()}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="profile-name">{displayName}</div>
+                                            <div className="profile-email">{session?.user?.email}</div>
+                                        </div>
+                                        <div className="profile-actions">
+                                            <button
+                                                onClick={handleOpenSettings}
+                                                className="btn-settings">
+                                                <FontAwesomeIcon icon={faGear} /> 設定
+                                            </button>
+                                            <button
+                                                onClick={handleLogout}
+                                                className="btn-logout">
+                                                <FontAwesomeIcon icon={faRightFromBracket} /> ログアウト
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </button>
+                        ) : (
+                            <button className="login-button" onClick={handleGoogleSignIn}>
+                                ログイン
+                            </button>
+                        )}
+                    </div>
+                </header>
+
+                {/* メインコンテンツ */}
+                <main className="search-page-main">
+                    {loading && (
+                        <div className="loading">検索中...</div>
                     )}
-                </div>
-            </header>
 
-            {/* メインコンテンツ */}
-            <main className="search-page-main">
-                {loading && (
-                    <div className="loading">検索中...</div>
-                )}
-
-                {error && (
-                    <div className="error-message">
-                        エラー: {error}
-                    </div>
-                )}
-
-                {!loading && !error && totalResults !== '0' && (
-                    <div className="results-info">
-                        約 {parseInt(totalResults).toLocaleString()} 件の結果
-                    </div>
-                )}
-
-                {!loading && !error && results.length === 0 && searchParams.get('q') && (
-                    <div className="no-results">
-                        <p>「{searchParams.get('q')}」に一致する情報は見つかりませんでした。</p>
-                    </div>
-                )}
-
-                <div className="search-results">
-                    {results.map((result, index) => (
-                        <div key={index} className="search-result-item">
-                            <div className="result-url">{result.displayLink}</div>
-                            <h3 className="result-title">
-                                <a
-                                    href={result.link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                >
-                                    {result.title}
-                                </a>
-                            </h3>
-                            <p className="result-snippet">{result.snippet}</p>
+                    {error && (
+                        <div className="error-message">
+                            エラー: {error}
                         </div>
-                    ))}
-                </div>
-            </main>
+                    )}
 
-            {/* ルームモーダル */}
-            {showRoomModal && (
-                <div className="modal-overlay" onClick={() => setShowRoomModal(false)}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <button className="modal-close" onClick={() => setShowRoomModal(false)}>
-                            ×
-                        </button>
-
-                        <h2 className="modal-title">ルームに参加</h2>
-                        <p className="modal-subtitle">
-                            既存のルームに参加するか、新しいルームを作成しましょう
-                        </p>
-
-                        <div className="modal-input-group">
-                            <label htmlFor="room-name">ルーム名</label>
-                            <input
-                                id="room-name"
-                                type="text"
-                                placeholder="例: my-room"
-                                value={roomInput}
-                                onChange={(e) => setRoomInput(e.target.value)}
-                                onKeyPress={handleKeyPress}
-                                autoFocus
-                            />
+                    {!loading && !error && totalResults !== '0' && (
+                        <div className="results-info">
+                            約 {parseInt(totalResults).toLocaleString()} 件の結果
                         </div>
+                    )}
 
-                        <button className="btn-modal-primary" onClick={handleJoinRoom}>
-                            このルームに参加
-                        </button>
+                    {!loading && !error && results.length === 0 && searchParams.get('q') && (
+                        <div className="no-results">
+                            <p>「{searchParams.get('q')}」に一致する情報は見つかりませんでした。</p>
+                        </div>
+                    )}
 
-                        <div className="modal-divider">
-                            <span>ルーム一覧</span>
+                    <div className="search-results">
+                        {results.map((result, index) => (
+                            <div key={index} className="search-result-item">
+                                <div className="result-url">
+                                    {result.favicon && (
+                                        <img
+                                            src={result.favicon}
+                                            alt=""
+                                            className="result-favicon"
+                                            onError={(e) => {
+                                                e.currentTarget.style.display = 'none';
+                                            }}
+                                        />
+                                    )}
+                                    {result.displayLink}
+                                </div>
+                                <h3 className="result-title">
+                                    <a
+                                        href={result.link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        {result.title}
+                                    </a>
+                                </h3>
+                                <p className="result-snippet">{result.snippet}</p>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* ページネーション */}
+                    {!loading && !error && results.length > 0 && totalPages > 1 && (
+                        <div className="pagination">
+                            <button
+                                className="pagination-btn"
+                                onClick={() => handlePageChange(currentPage - 1)}
+                                disabled={currentPage === 1}
+                            >
+                                ← 前へ
+                            </button>
+
+                            <div className="pagination-numbers">
+                                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                    <button
+                                        key={page}
+                                        className={`pagination-number ${currentPage === page ? 'active' : ''}`}
+                                        onClick={() => handlePageChange(page)}
+                                    >
+                                        {page}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <button
+                                className="pagination-btn"
+                                onClick={() => handlePageChange(currentPage + 1)}
+                                disabled={currentPage === totalPages}
+                            >
+                                次へ →
+                            </button>
+                        </div>
+                    )}
+                </main>
+
+                {/* ルームモーダル */}
+                {showRoomModal && (
+                    <div className="modal-overlay" onClick={() => setShowRoomModal(false)}>
+                        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                            <button className="modal-close" onClick={() => setShowRoomModal(false)}>
+                                ×
+                            </button>
+
+                            <h2 className="modal-title">ルームに参加</h2>
+                            <p className="modal-subtitle">
+                                既存のルームに参加するか、新しいルームを作成しましょう
+                            </p>
+
+                            <div className="modal-input-group">
+                                <label htmlFor="room-name">ルーム名</label>
+                                <input
+                                    id="room-name"
+                                    type="text"
+                                    placeholder="例: my-room"
+                                    value={roomInput}
+                                    onChange={(e) => setRoomInput(e.target.value)}
+                                    onKeyPress={handleKeyPress}
+                                    autoFocus
+                                />
+                            </div>
+
+                            <button className="btn-modal-primary" onClick={handleJoinRoom}>
+                                このルームに参加
+                            </button>
+
+                            <div className="modal-divider">
+                                <span>ルーム一覧</span>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
 
             {/* Settings Modal */}
             {showSettingsModal && (

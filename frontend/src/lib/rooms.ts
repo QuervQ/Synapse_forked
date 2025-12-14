@@ -17,12 +17,8 @@ export interface Participant {
     joined_at: string;
 }
 
-/**
- * ルームを作成または取得する
- */
 export const createOrGetRoom = async (roomName: string, userId: string, isPrivate: boolean = false) => {
     try {
-        // まず既存のルームを検索 (名前で検索)
         const { data: existingRoom, error: fetchError } = await supabase
             .from('rooms')
             .select('*')
@@ -34,13 +30,10 @@ export const createOrGetRoom = async (roomName: string, userId: string, isPrivat
             return { data: null, error: fetchError };
         }
 
-        // 既存のルームがあればそれを返す
         if (existingRoom) {
             return { data: existingRoom, error: null };
         }
 
-        // 新しいルームを作成
-        // Note: is_private column needs to be added to the DB if not exists
         const { data: newRoom, error: createError } = await supabase
             .from('rooms')
             .insert([
@@ -65,12 +58,8 @@ export const createOrGetRoom = async (roomName: string, userId: string, isPrivat
     }
 };
 
-/**
- * ルームに参加する
- */
 export const joinRoom = async (roomId: string, userId: string, userName: string) => {
     try {
-        // 既に参加しているか確認
         const { data: existingParticipant, error: checkError } = await supabase
             .from('participants')
             .select('*')
@@ -83,12 +72,10 @@ export const joinRoom = async (roomId: string, userId: string, userName: string)
             return { error: checkError };
         }
 
-        // 既に参加していればスキップ
         if (existingParticipant) {
             return { error: null };
         }
 
-        // 新規参加
         const { error: insertError } = await supabase
             .from('participants')
             .insert([
@@ -112,9 +99,6 @@ export const joinRoom = async (roomId: string, userId: string, userName: string)
     }
 };
 
-/**
- * ルームから退出する
- */
 export const leaveRoom = async (roomId: string, userId: string) => {
     try {
         const { error } = await supabase
@@ -135,15 +119,12 @@ export const leaveRoom = async (roomId: string, userId: string) => {
     }
 };
 
-/**
- * ルーム一覧を取得する
- */
 export const getRooms = async (limit: number = 10) => {
     try {
         const { data, error } = await supabase
             .from('rooms')
             .select('*')
-            .eq('is_private', false) // Only show public rooms
+            .eq('is_private', false)
             .order('created_at', { ascending: false })
             .limit(limit);
 
@@ -159,9 +140,6 @@ export const getRooms = async (limit: number = 10) => {
     }
 };
 
-/**
- * ルームの参加者を取得する
- */
 export const getRoomParticipants = async (roomId: string) => {
     try {
         const { data, error } = await supabase
