@@ -23,6 +23,27 @@ interface CursorData {
     color: string;
 }
 
+const URL_REGEX = /(https?:\/\/[^\s]+)/g;
+
+function linkifyText(text: string): React.ReactNode {
+    return text.split(URL_REGEX).map((part, i) =>
+        part.startsWith('http')
+            ? (
+                <a
+                    key={i}
+                    href={part}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="message-link"
+                >
+                    {part}
+                </a>
+            )
+            : <span key={i}>{part}</span>
+    );
+}
+
+
 export default function RoomPage() {
     const { roomId } = useParams<{ roomId: string }>();
     const navigate = useNavigate();
@@ -33,7 +54,6 @@ export default function RoomPage() {
     const [messageInput, setMessageInput] = useState('');
     const [onlineCount, setOnlineCount] = useState(0);
     const [cursors, setCursors] = useState<Map<string, CursorData>>(new Map());
-    const [displayName] = useState('');
     const [loading, setLoading] = useState(true);
     const supabaseRef = useRef<any>(null);
     const cursorChannelRef = useRef<RealtimeChannel | null>(null);
@@ -133,7 +153,7 @@ export default function RoomPage() {
                 updateCursors(state);
                 setOnlineCount(Object.keys(state).length);
             })
-                .on('presence', { event: 'leave' }, ({ key }) => {
+            .on('presence', { event: 'leave' }, ({ key }) => {
                 setCursors(prev => {
                     const newCursors = new Map(prev);
                     newCursors.delete(key);
@@ -158,8 +178,8 @@ export default function RoomPage() {
         chatChannel
             .on('broadcast', { event: 'message' }, ({ payload }: { payload: Message }) => {
                 setMessages(prev => {
-                    const messageExists = prev.some(msg => 
-                        msg.userId === payload.userId && 
+                    const messageExists = prev.some(msg =>
+                        msg.userId === payload.userId &&
                         msg.timestamp === payload.timestamp &&
                         msg.text === payload.text
                     );
@@ -243,7 +263,7 @@ export default function RoomPage() {
     return (
         <div className="room-page">
             <div className="cursor-area" onMouseMove={handleMouseMove}>
-                {Array.from(cursors.entries()).map(([userId, data]) => (
+                {Array.from(cursors.entries()).map(([userId, data]: [string, CursorData]) => (
                     <div
                         key={userId}
                         className="cursor"
@@ -263,13 +283,15 @@ export default function RoomPage() {
                     <span className="online-count">👤 {onlineCount}人</span>
                 </div>
                 <div className="messages">
-                    {messages.map((msg, index) => (
+                    {messages.map((msg: Message, index: number) => (
                         <div
                             key={index}
                             className={`message ${msg.userId === myUserIdRef.current ? 'own' : ''}`}
                         >
-                            <div className="message-user">{displayName}</div>
-                            <div className="message-text">{msg.text}</div>
+                            <div className="message-user">{msg.user}</div>
+                            <div className="message-text">
+                                {linkifyText(msg.text)}
+                            </div>
                         </div>
                     ))}
                     <div ref={messagesEndRef} />
@@ -281,7 +303,7 @@ export default function RoomPage() {
                         placeholder="メッセージを入力..."
                         maxLength={200}
                         value={messageInput}
-                        onChange={(e) => setMessageInput(e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMessageInput(e.target.value)}
                         onKeyPress={handleKeyPress}
                     />
                     <button className="send-button" onClick={handleSendMessage}>

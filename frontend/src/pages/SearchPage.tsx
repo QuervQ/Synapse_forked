@@ -1,11 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faMagnifyingGlass, faGear, faRightFromBracket} from '@fortawesome/free-solid-svg-icons';
+import { faMagnifyingGlass, faGear, faRightFromBracket } from '@fortawesome/free-solid-svg-icons';
 import { searchGoogle, SearchResult } from '../lib/search';
-import { supabase } from '../lib/supabase';
+import { supabase, getSession } from '../lib/supabase';
+import { createOrGetRoom, getRooms } from '../lib/rooms';
 import ChatInterface from '../components/ChatInterface';
 import '../styles/SearchPage.css';
+
+interface RoomListItem {
+    id: string;
+    dbId: string;
+    created_by: string;
+    created_at: string;
+    participant_count?: number;
+}
 
 interface GoogleAppsIconProps {
     className?: string;
@@ -59,6 +68,11 @@ export default function SearchPage() {
     const query = searchParams.get('q');
     const [currentPage, setCurrentPage] = useState(1);
     const resultsPerPage = 10;
+    const [loadingRooms, setLoadingRooms] = useState(false);
+    const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
+    const [newRoomName, setNewRoomName] = useState('');
+    const [isPrivate, setIsPrivate] = useState(false);
+    const [rooms, setRooms] = useState<RoomListItem[]>([]);
 
     useEffect(() => {
         const query = searchParams.get('q');
@@ -136,6 +150,11 @@ export default function SearchPage() {
         setShowProfileMenu(false);
     };
 
+    const handleJoinExistingRoom = (roomId: string) => {
+        setSearchParams({ v: roomId });
+        setShowRoomModal(false);
+    };
+
     const handleSaveSettings = async () => {
         if (!session?.user) return;
 
@@ -158,6 +177,36 @@ export default function SearchPage() {
         } catch (error) {
             console.error('Error updating profile:', error);
             alert('プロフィールの更新に失敗しました');
+        }
+    };
+
+    const handleCreateRoom = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const roomName = newRoomName.trim();
+        if (!roomName) return;
+
+        try {
+            const session = await getSession();
+            if (!session?.user) {
+                alert('ルームを作成するにはログインが必要です');
+                return;
+            }
+
+            const { error } = await createOrGetRoom(roomName, session.user.id, isPrivate);
+
+            if (error) {
+                console.error('Failed to create room:', error);
+                alert('ルームの作成に失敗しました (すでに存在する名前かもしれません)');
+                return;
+            }
+
+            setSearchParams({ v: roomName });
+            setShowCreateRoomModal(false);
+            setNewRoomName('');
+            setIsPrivate(false);
+        } catch (err) {
+            console.error('Unexpected error creating room:', err);
+            alert('エラーが発生しました');
         }
     };
 
@@ -263,6 +312,57 @@ export default function SearchPage() {
         setDisplayName('');
         setEmail('');
     };
+
+    const loadRooms = async () => {
+        setLoadingRooms(true);
+        try {
+            const { data, error } = await getRooms(30);
+            if (error) {
+                console.error('Failed to fetch rooms:', error);
+                setRooms([]);
+                return;
+            }
+
+            if (!data) {
+                setRooms([]);
+                return;
+            }
+
+            const roomsWithCounts = await Promise.all(
+                data.map(async (room) => {
+                    const { count, error: countError } = await supabase
+                        .from('participants')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('room_id', room.id);
+
+                    if (countError) {
+                        console.warn('Failed to fetch participant count:', countError);
+                    }
+
+                    return {
+                        id: room.room_name,
+                        dbId: room.id,
+                        created_by: room.created_by,
+                        created_at: room.created_at,
+                        participant_count: typeof count === 'number' ? count : 0,
+                    } as RoomListItem;
+                })
+            );
+
+            setRooms(roomsWithCounts);
+        } catch (err) {
+            console.error('Unexpected error loading rooms:', err);
+            setRooms([]);
+        } finally {
+            setLoadingRooms(false);
+        }
+    };
+
+    useEffect(() => {
+        if (showRoomModal) {
+            loadRooms();
+        }
+    }, [showRoomModal]);
 
     const apps = [
         { name: 'Chat', icon: '/images/icon.png', action: () => setShowRoomModal(true) },
@@ -484,6 +584,48 @@ export default function SearchPage() {
                     )}
                 </main>
 
+                {/* Room Creation Modal */}
+                {showCreateRoomModal && (
+                    <div className="modal-overlay" onClick={() => setShowCreateRoomModal(false)}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()}>
+                            <div className="modal-header">
+                                <h3>ルームを作成</h3>
+                                <button className="close-button" onClick={() => setShowCreateRoomModal(false)}>×</button>
+                            </div>
+                            <form onSubmit={handleCreateRoom}>
+                                <div className="form-group">
+                                    <label>ルーム名 (URLになります)</label>
+                                    <input
+                                        type="text"
+                                        value={newRoomName}
+                                        onChange={(e) => setNewRoomName(e.target.value)}
+                                        placeholder="例: general, random, my-room"
+                                        className="modal-input"
+                                        pattern="[a-zA-Z0-9-_]+"
+                                        title="半角英数字、ハイフン、アンダースコアのみ使用可能です"
+                                        required
+                                    />
+                                </div>
+                                <div className="form-group checkbox-group">
+                                    <label>
+                                        <input
+                                            type="checkbox"
+                                            checked={isPrivate}
+                                            onChange={(e) => setIsPrivate(e.target.checked)}
+                                            className="room-private"
+                                        />
+                                        プライベートルームにする
+                                    </label>
+                                </div>
+                                <div className="modal-actions">
+                                    <button type="button" className="btn-modal-secondary" onClick={() => setShowCreateRoomModal(false)}>キャンセル</button>
+                                    <button type="submit" className="btn-modal-primary">作成</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
                 {/* ルームモーダル */}
                 {showRoomModal && (
                     <div className="modal-overlay" onClick={() => setShowRoomModal(false)}>
@@ -514,53 +656,91 @@ export default function SearchPage() {
                                 このルームに参加
                             </button>
 
+                            <div className="create-room-section">
+                                <button
+                                    className="btn-create-room"
+                                    onClick={() => {
+                                        setShowRoomModal(false);
+                                        setShowCreateRoomModal(true);
+                                    }}
+                                >
+                                    <i className="fa-solid fa-plus"></i>
+                                    新しいルームを作成する
+                                </button>
+                            </div>
+
                             <div className="modal-divider">
                                 <span>ルーム一覧</span>
+                            </div>
+
+                            <div className="active-rooms">
+                                {loadingRooms ? (
+                                    <p style={{ color: '#999', textAlign: 'center' }}>読み込み中...</p>
+                                ) : rooms.length === 0 ? (
+                                    <p style={{ color: '#999', textAlign: 'center' }}>
+                                        まだルームがありません。<br />上記から新しいルームを作成してください。
+                                    </p>
+                                ) : (
+                                    <div className="room-list">
+                                        {rooms.map((room) => (
+                                            <button
+                                                key={room.id}
+                                                className="room-item"
+                                                onClick={() => handleJoinExistingRoom(room.id)}
+                                            >
+                                                <span className="room-name">{room.id}</span>
+                                                <span className="room-count">
+                                                    <i className="fa-solid fa-user"></i> {room.participant_count || 0}人
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
                 )}
-            </div>
 
-            {/* Settings Modal */}
-            {showSettingsModal && (
-                <div className="modal-overlay" onClick={() => setShowSettingsModal(false)}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <button className="modal-close" onClick={() => setShowSettingsModal(false)}>
-                            ×
-                        </button>
+                {/* Settings Modal */}
+                {showSettingsModal && (
+                    <div className="modal-overlay" onClick={() => setShowSettingsModal(false)}>
+                        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                            <button className="modal-close" onClick={() => setShowSettingsModal(false)}>
+                                ×
+                            </button>
 
-                        <h2 className="modal-title">プロフィール設定</h2>
+                            <h2 className="modal-title">プロフィール設定</h2>
 
-                        <div className="modal-input-group">
-                            <label>表示名</label>
-                            <input
-                                type="text"
-                                value={settingsName}
-                                onChange={(e) => setSettingsName(e.target.value)}
-                                placeholder="表示名を入力"
-                            />
+                            <div className="modal-input-group">
+                                <label>表示名</label>
+                                <input
+                                    type="text"
+                                    value={settingsName}
+                                    onChange={(e) => setSettingsName(e.target.value)}
+                                    placeholder="表示名を入力"
+                                />
+                            </div>
+
+                            <div style={{ marginTop: '20px' }}>
+                                {settingsAvatarUrl && (
+                                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+                                        <img
+                                            src={settingsAvatarUrl}
+                                            alt="Preview"
+                                            style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }}
+                                            onError={(e) => (e.currentTarget.style.display = 'none')}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            <button className="btn-modal-primary" onClick={handleSaveSettings}>
+                                保存
+                            </button>
                         </div>
-
-                        <div style={{ marginTop: '20px' }}>
-                            {settingsAvatarUrl && (
-                                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-                                    <img
-                                        src={settingsAvatarUrl}
-                                        alt="Preview"
-                                        style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }}
-                                        onError={(e) => (e.currentTarget.style.display = 'none')}
-                                    />
-                                </div>
-                            )}
-                        </div>
-
-                        <button className="btn-modal-primary" onClick={handleSaveSettings}>
-                            保存
-                        </button>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 }

@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClient, RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faRightFromBracket, faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
 import { getSession } from '../lib/supabase';
 import { createOrGetRoom, joinRoom, leaveRoom } from '../lib/rooms';
 import '../styles/RoomPage.css';
@@ -299,6 +301,50 @@ export default function ChatInterface({ roomId, onClose }: ChatInterfaceProps) {
         }
     };
 
+    const handleExitRoom = async (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
+        const roomToLeave = currentRoomIdRef.current;
+        const userId = myUserIdRef.current;
+
+        if (!roomToLeave || !userId) {
+            if (onClose) onClose();
+            return;
+        }
+
+        try {
+            (cursorChannelRef.current as any)?.untrack?.();
+            if (cursorChannelRef.current) {
+                await cursorChannelRef.current.unsubscribe();
+                cursorChannelRef.current = null;
+            }
+
+            if (chatChannelRef.current) {
+                await chatChannelRef.current.unsubscribe();
+                chatChannelRef.current = null;
+            }
+
+            const { error } = await leaveRoom(roomToLeave, userId);
+            if (error) {
+                console.error('退出に失敗しました:', error);
+                alert('退出に失敗しました');
+                return;
+            }
+
+            setOnlineCount(prev => Math.max(0, prev - 1));
+            setMessages([]);
+            setCurrentRoomId('');
+            currentRoomIdRef.current = null;
+            supabaseRef.current = null;
+            setIsCollapsed(false);
+        } catch (err) {
+            console.error('退出処理でエラーが発生しました:', err);
+            alert('退出処理でエラーが発生しました');
+            return;
+        } finally {
+            if (onClose) onClose();
+        }
+    };
+
     if (loading) {
         return (
             <div className="chat-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -311,11 +357,34 @@ export default function ChatInterface({ roomId, onClose }: ChatInterfaceProps) {
         <div
             className={`chat-container ${isCollapsed ? 'collapsed' : ''}`}
             onClick={isCollapsed ? () => setIsCollapsed(false) : undefined}
-            style={{ cursor: isCollapsed ? 'pointer' : 'default' }}
         >
+            {isCollapsed && (
+                <button
+                    type="button"
+                    className="chat-collapsed-toggle"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsCollapsed(false);
+                    }}
+                    aria-label="チャットを開く"
+                >
+                    <FontAwesomeIcon icon={faChevronRight} />
+                </button>
+            )}
             <div className="chat-header">
-                <span><i className="fa-jelly fa-regular fa-comment-dots"></i> {roomId}</span>
-                <span className="online-count"><i className="fa-solid fa-user"></i> {onlineCount}人</span>
+                <button
+                    type="button"
+                    className="exit-button"
+                    onClick={handleExitRoom}
+                    title="ルームから退出する"
+                >
+                    <FontAwesomeIcon icon={faRightFromBracket} />
+                    <span>退出</span>
+                </button>
+                <div className="chat-header-info">
+                    <span className="chat-room-title"><i className="fa-jelly fa-regular fa-comment-dots"></i> {roomId}</span>
+                    <span className="online-count"><i className="fa-solid fa-user"></i> {onlineCount}人</span>
+                </div>
                 <button
                     className="collapse-button"
                     onClick={(e) => {
@@ -324,20 +393,8 @@ export default function ChatInterface({ roomId, onClose }: ChatInterfaceProps) {
                     }}
                     title={isCollapsed ? 'チャットを展開' : 'チャットを折りたたむ'}
                 >
-                    <i className={`fa-solid ${isCollapsed ? 'fa-chevron-right' : 'fa-chevron-left'}`}></i>
+                    <FontAwesomeIcon icon={isCollapsed ? faChevronRight : faChevronLeft} />
                 </button>
-                {onClose && (
-                    <button
-                        className="close-button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onClose();
-                        }}
-                        title="チャットを閉じる"
-                    >
-                        Close
-                    </button>
-                )}
             </div>
             <div className="messages">
                 {messages.map((msg, index) => (

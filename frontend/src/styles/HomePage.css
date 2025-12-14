@@ -595,12 +595,6 @@
     line-height: 1.5;
 }
 
-.active-rooms {
-    margin-top: 32px;
-    padding-top: 24px;
-    border-top: 1px solid #3a3a3a;
-}
-
 .active-rooms h3 {
     color: #ddd;
     font-size: 0.95em;
@@ -608,9 +602,7 @@
 }
 
 .create-room-section {
-    margin-top: 24px;
-    padding-top: 20px;
-    border-top: 1px solid #3a3a3a;
+    margin-top: 18px;
     text-align: center;
 }
 
@@ -641,6 +633,10 @@
     gap: 8px;
     max-height: 200px;
     overflow-y: auto;
+}
+
+.room-list::-webkit-scrollbar {
+    display: none;
 }
 
 .room-item {

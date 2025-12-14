@@ -23,6 +23,22 @@
     cursor: crosshair;
 }
 
+.message-link {
+    color: #4ECDC4;
+    text-decoration: underline;
+    word-break: break-all;
+    cursor: pointer;
+}
+
+.message-link:hover {
+    color: #45B7D1;
+    text-decoration: underline;
+}
+
+.message-link:visited {
+    color: #3BA89F;
+}
+
 .cursor {
     position: absolute;
     width: 20px;
@@ -49,47 +65,121 @@
 .chat-container {
     width: 380px;
     flex-shrink: 0;
-    border-right: 1px solid #dfe1e5;
+    border-left: 1px solid #dfe1e5;
     background: linear-gradient(45deg, #511177, #ae6cd2, #de6583, #ae2048);
     height: 100%;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    transition: width 0.3s ease, transform 0.3s ease;
+    transition: width 0.28s ease, opacity 0.28s ease;
     position: relative;
 }
 
 .chat-container.collapsed {
-    width: 40px;
-    overflow: hidden;
+    width: 28px;
+    min-width: 28px;
+    opacity: 0.85;
+    border-left: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.35);
+    background: linear-gradient(180deg, rgba(118, 75, 162, 0.85), rgba(81, 17, 119, 0.9));
+}
+
+.chat-container.collapsed:hover {
+    opacity: 1;
 }
 
 .chat-container.collapsed .chat-header,
 .chat-container.collapsed .messages,
 .chat-container.collapsed .input-container {
+    opacity: 0;
     pointer-events: none;
+    visibility: hidden;
 }
 
-.chat-container.collapsed:hover {
-    opacity: 0.9;
+.chat-collapsed-toggle {
+    display: none;
+    position: absolute;
+    top: 10px;
+    right: 6px;
+    width: 18px;
+    height: 20px;
+    border: none;
+    background: transparent;
+    color: #ffffff;
+    cursor: pointer;
+    padding: 0;
+    align-items: center;
+    justify-content: center;
+}
+
+.chat-collapsed-toggle i {
+    font-size: 16px;
+}
+
+.chat-container.collapsed .chat-collapsed-toggle {
+    display: flex;
 }
 
 .chat-header {
-    padding: 16px;
+    padding: 14px 16px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    font-weight: bold;
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 12px;
+}
+
+.chat-header-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+}
+
+.chat-room-title {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .online-count {
     font-size: 12px;
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.25);
     padding: 4px 8px;
-    border-radius: 12px;
-    margin-left: 5px;
+    border-radius: 999px;
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.exit-button {
+    border: none;
+    background: rgba(0, 0, 0, 0.25);
+    color: #ffffff;
+    padding: 8px 12px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.exit-button:hover {
+    background: rgba(0, 0, 0, 0.35);
+    transform: translateY(-1px);
+}
+
+.exit-button:active {
+    transform: translateY(0);
 }
 
 .collapse-button {
@@ -97,7 +187,7 @@
     border: none;
     color: white;
     cursor: pointer;
-    padding: 4px 8px;
+    padding: 6px 8px;
     margin-left: auto;
     font-size: 16px;
     transition: transform 0.2s ease;
@@ -107,33 +197,11 @@
 }
 
 .collapse-button:hover {
-    transform: scale(1.1);
+    transform: scale(1.08);
 }
 
 .collapse-button:active {
     transform: scale(0.95);
-}
-
-.close-button {
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
-    cursor: pointer;
-    padding: 6px 12px;
-    border-radius: 4px;
-    font-size: 13px;
-    font-weight: 500;
-    transition: background 0.2s ease, transform 0.2s ease;
-    margin-left: 8px;
-}
-
-.close-button:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: translateY(-1px);
-}
-
-.close-button:active {
-    transform: translateY(0);
 }
 
 .messages {

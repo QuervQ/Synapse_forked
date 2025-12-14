@@ -6,7 +6,7 @@ import { faMoon as faMoonRegular } from '@fortawesome/free-regular-svg-icons';
 import { faMoon as faMoonSolid } from '@fortawesome/free-solid-svg-icons';
 import { supabase, getSession } from '../lib/supabase';
 import ChatInterface from '../components/ChatInterface';
-import { createOrGetRoom } from '../lib/rooms';
+import { createOrGetRoom, getRooms } from '../lib/rooms';
 import '../styles/HomePage.css';
 
 interface GoogleAppsIconProps {
@@ -15,9 +15,9 @@ interface GoogleAppsIconProps {
     color?: string;
 }
 
-interface Room {
+interface RoomListItem {
     id: string;
-    name: string;
+    dbId: string;
     created_by: string;
     created_at: string;
     participant_count?: number;
@@ -62,8 +62,14 @@ export default function GoogleStyleHome() {
         const savedTheme = localStorage.getItem('theme');
         return (savedTheme === 'dark' || savedTheme === 'light') ? savedTheme : 'light';
     });
-    const [rooms] = useState<Room[]>([]);
-    const [loadingRooms] = useState(false);
+    const [rooms, setRooms] = useState<RoomListItem[]>([]);
+    const [loadingRooms, setLoadingRooms] = useState(false);
+    const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+    const [language, setLanguage] = useState<'ja' | 'en' | 'ru' | 'es' | 'pt'>('ja');
+    const [showLanguageMenu, setShowLanguageMenu] = useState(false);
+    const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
+    const [newRoomName, setNewRoomName] = useState('');
+    const [isPrivate, setIsPrivate] = useState(false);
 
     const toggleTheme = () => {
         console.log('Toggling theme');
@@ -144,9 +150,9 @@ export default function GoogleStyleHome() {
         setShowRoomModal(false);
     };
 
-    const handleJoinExistingRoom = (roomId: string) => {
+    const handleJoinExistingRoom = (roomName: string) => {
         // navigate(`/room/${roomId}`);
-        setSearchParams({ v: roomId });
+        setSearchParams({ v: roomName });
         setShowRoomModal(false);
     };
 
@@ -162,8 +168,46 @@ export default function GoogleStyleHome() {
         setAvatarUrl(user.user_metadata?.picture ?? null);
     };
 
+    const handleAvatarFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file || !session?.user) return;
+
+        setIsUploadingAvatar(true);
+
+        try {
+            const fileExt = file.name.split('.').pop();
+            const filePath = `${session.user.id}/${Date.now()}.${fileExt}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(filePath, file, {
+                    upsert: true,
+                    cacheControl: '3600',
+                });
+
+            if (uploadError) {
+                throw uploadError;
+            }
+
+            const { data: publicUrlData } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(filePath);
+
+            const publicUrl = publicUrlData.publicUrl;
+            if (!publicUrl) {
+                throw new Error('Failed to obtain public URL for avatar');
+            }
+            setSettingsAvatarUrl(publicUrl);
+        } catch (error) {
+            console.error('Error uploading avatar:', error);
+            alert('アイコン画像のアップロードに失敗しました');
+        } finally {
+            setIsUploadingAvatar(false);
+        }
+    };
+
     const handleGoogleSignIn = async () => {
-        const redirectTo = window.location.origin;
+        const redirectTo = window.location.origin; // 現在のオリジン（localhost）を取得
         await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
@@ -193,14 +237,6 @@ export default function GoogleStyleHome() {
     const apps = [
         { name: 'Chat', icon: '/images/icon.png', action: () => setShowRoomModal(true) },
     ];
-
-    const [language, setLanguage] = useState<'ja' | 'en' | 'ru' | 'es' | 'pt'>('ja');
-    const [showLanguageMenu, setShowLanguageMenu] = useState(false);
-
-    // Create Room State
-    const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
-    const [newRoomName, setNewRoomName] = useState('');
-    const [isPrivate, setIsPrivate] = useState(false);
 
     const LANGUAGES = [
         { code: 'ja', label: '日本語', short: 'JP' },
@@ -235,15 +271,68 @@ export default function GoogleStyleHome() {
                 return;
             }
 
+            // Success: navigate to the room
             setSearchParams({ v: roomName });
             setShowCreateRoomModal(false);
             setNewRoomName('');
             setIsPrivate(false);
+            await loadRooms();
         } catch (err) {
             console.error('Unexpected error creating room:', err);
             alert('エラーが発生しました');
         }
     };
+
+    const loadRooms = async () => {
+        setLoadingRooms(true);
+        try {
+            const { data, error } = await getRooms(30);
+            if (error) {
+                console.error('Failed to fetch rooms:', error);
+                setRooms([]);
+                return;
+            }
+
+            if (!data) {
+                setRooms([]);
+                return;
+            }
+
+            const roomsWithCounts = await Promise.all(
+                data.map(async (room) => {
+                    const { count, error: countError } = await supabase
+                        .from('participants')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('room_id', room.id);
+
+                    if (countError) {
+                        console.warn('Failed to fetch participant count:', countError);
+                    }
+
+                    return {
+                        id: room.room_name,
+                        dbId: room.id,
+                        created_by: room.created_by,
+                        created_at: room.created_at,
+                        participant_count: typeof count === 'number' ? count : 0,
+                    } as RoomListItem;
+                })
+            );
+
+            setRooms(roomsWithCounts);
+        } catch (err) {
+            console.error('Unexpected error loading rooms:', err);
+            setRooms([]);
+        } finally {
+            setLoadingRooms(false);
+        }
+    };
+
+    useEffect(() => {
+        if (showRoomModal) {
+            loadRooms();
+        }
+    }, [showRoomModal]);
 
     return (
         <div className={`google-home-container ${theme === 'dark' ? 'dark-mode' : ''} ${activeRoomId ? 'with-sidebar' : ''}`}>
@@ -552,6 +641,20 @@ export default function GoogleStyleHome() {
                                         onError={(e) => (e.currentTarget.style.display = 'none')}
                                     />
                                 </div>
+                            )}
+                        </div>
+
+                        <div className="modal-input-group">
+                            <label htmlFor="avatar-upload">アイコン画像</label>
+                            <input
+                                id="avatar-upload"
+                                type="file"
+                                accept="image/*"
+                                onChange={handleAvatarFileChange}
+                                disabled={isUploadingAvatar}
+                            />
+                            {isUploadingAvatar && (
+                                <p className="upload-status">アップロード中...</p>
                             )}
                         </div>
 
