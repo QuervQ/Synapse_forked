@@ -55,13 +55,29 @@
     overflow-y: auto;
     display: flex;
     flex-direction: column;
+    transition: width 0.3s ease, transform 0.3s ease;
+    position: relative;
+}
+
+.chat-container.collapsed {
+    width: 40px;
+    overflow: hidden;
+}
+
+.chat-container.collapsed .chat-header,
+.chat-container.collapsed .messages,
+.chat-container.collapsed .input-container {
+    pointer-events: none;
+}
+
+.chat-container.collapsed:hover {
+    opacity: 0.9;
 }
 
 .chat-header {
     padding: 16px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    border-radius: 12px 12px 0 0;
     font-weight: bold;
     display: flex;
     justify-content: space-between;
@@ -74,6 +90,50 @@
     padding: 4px 8px;
     border-radius: 12px;
     margin-left: 5px;
+}
+
+.collapse-button {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 4px 8px;
+    margin-left: auto;
+    font-size: 16px;
+    transition: transform 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.collapse-button:hover {
+    transform: scale(1.1);
+}
+
+.collapse-button:active {
+    transform: scale(0.95);
+}
+
+.close-button {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.2s ease, transform 0.2s ease;
+    margin-left: 8px;
+}
+
+.close-button:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.close-button:active {
+    transform: translateY(0);
 }
 
 .messages {

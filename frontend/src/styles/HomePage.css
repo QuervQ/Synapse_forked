@@ -965,7 +965,7 @@
 }
 
 .sidebar-chat {
-    width: 380px;
+    width: auto;
     flex-shrink: 0;
     border-right: 1px solid #dfe1e5;
     background: #fff;

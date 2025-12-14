@@ -57,13 +57,20 @@ export default function GoogleStyleHome() {
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [settingsName, setSettingsName] = useState('');
     const [settingsAvatarUrl, setSettingsAvatarUrl] = useState('');
-    const [theme, setTheme] = useState<'light' | 'dark'>('light');
+    const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+        const savedTheme = localStorage.getItem('theme');
+        return (savedTheme === 'dark' || savedTheme === 'light') ? savedTheme : 'light';
+    });
     const [rooms, setRooms] = useState<Room[]>([]);
     const [loadingRooms, setLoadingRooms] = useState(false);
 
     const toggleTheme = () => {
         console.log('Toggling theme');
-        setTheme(prev => prev === 'light' ? 'dark' : 'light');
+        setTheme(prev => {
+            const newTheme = prev === 'light' ? 'dark' : 'light';
+            localStorage.setItem('theme', newTheme);
+            return newTheme;
+        });
     };
 
     useEffect(() => {

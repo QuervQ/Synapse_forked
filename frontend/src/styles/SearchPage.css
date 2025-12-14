@@ -1,11 +1,14 @@
 .search-page-container {
     min-height: 100vh;
     background-color: #fff;
+    display: flex;
+    flex-direction: column;
 }
 
 .search-page-header {
     border-bottom: 1px solid #ebebeb;
     padding: 15px 20px;
+    transition: padding 0.3s ease, font-size 0.3s ease;
 }
 
 .header-content {
@@ -25,6 +28,7 @@
     -webkit-text-fill-color: transparent;
     margin: 0;
     flex-shrink: 0;
+    transition: font-size 0.3s ease;
 }
 
 .search-form-header {
@@ -73,9 +77,9 @@
 }
 
 .search-page-main {
-    max-width: 800px;
+    max-width: 700px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 10px;
 }
 
 .loading {
@@ -166,4 +170,80 @@
     .search-page-main {
         padding: 15px;
     }
+}
+
+/* Sidebar Layout Styles */
+.search-page-container.with-sidebar {
+    flex-direction: row;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.search-page-container.with-sidebar> :not(.sidebar-chat) {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.sidebar-chat {
+    width: auto;
+    flex-shrink: 0;
+    border-right: 1px solid #dfe1e5;
+    background: #fff;
+    height: 100%;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.with-sidebar .search-page-main {
+    flex: 1;
+    height: 100%;
+    overflow-y: auto;
+    max-width: none;
+    padding: 10px 20px !important;
+    margin: 0;
+}
+
+.with-sidebar .search-page-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #fff;
+    width: 100%;
+    padding: 6px 12px;
+    border-bottom: 1px solid #ebebeb;
+}
+
+.with-sidebar .header-content {
+    max-width: none;
+    width: 100%;
+    gap: 10px;
+}
+
+.with-sidebar .logo {
+    font-size: 16px;
+}
+
+.with-sidebar .search-form-header {
+    max-width: 450px;
+}
+
+.with-sidebar .search-box-header {
+    padding: 4px 10px;
+}
+
+.with-sidebar .search-input-header {
+    font-size: 14px;
+}
+
+/* Dark Mode Sidebar */
+.dark-mode .sidebar-chat {
+    background-color: #202124;
+    border-right: 1px solid #3c4043;
+}
+
+.dark-mode .with-sidebar .search-page-header {
+    background: #202124;
 }

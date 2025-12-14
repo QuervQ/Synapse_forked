@@ -38,6 +38,7 @@ export default function ChatInterface({ roomId, onClose }: ChatInterfaceProps) {
     const [onlineCount, setOnlineCount] = useState(0);
     const [cursors, setCursors] = useState<Map<string, CursorData>>(new Map());
     const [loading, setLoading] = useState(true);
+    const [isCollapsed, setIsCollapsed] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const cursorChannelRef = useRef<RealtimeChannel | null>(null);
     const chatChannelRef = useRef<RealtimeChannel | null>(null);
@@ -240,20 +241,6 @@ export default function ChatInterface({ roomId, onClose }: ChatInterfaceProps) {
         setCursors(newCursors);
     };
 
-    const handleMouseMove = async (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!cursorChannelRef.current) return;
-
-        const x = e.clientX;
-        const y = e.clientY;
-
-        await cursorChannelRef.current.track({
-            user: username,
-            x: x,
-            y: y,
-            color: myColorRef.current,
-        });
-    };
-
     const handleSendMessage = async () => {
         const message = messageInput.trim();
         // Ensure we have the DB ID (currentRoomId) before sending
@@ -302,64 +289,69 @@ export default function ChatInterface({ roomId, onClose }: ChatInterfaceProps) {
 
     if (loading) {
         return (
-            <div className="room-page" style={{ position: 'relative', height: '100%', width: '100%' }}>
+            <div className="chat-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div className="room-loading">読み込み中...</div>
             </div>
         );
     }
 
     return (
-        <div className="room-page" style={{ position: 'relative', height: '100%', width: '100%' }}>
-            <div className="cursor-area" onMouseMove={handleMouseMove}>
-
-                <div className="chat-container">
-                    <div className="chat-header">
-                        <span><i className="fa-jelly fa-regular fa-comment-dots"></i> {roomId}</span>
-                        <span className="online-count"><i className="fa-solid fa-user"></i> {onlineCount}人</span>
-                        {onClose && (
-                            <button onClick={onClose} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'white' }}>×</button>
-                        )}
-                    </div>
-                    <div className="messages">
-                        {messages.map((msg, index) => (
-                            <div
-                                key={index}
-                                className={`message ${msg.userId === myUserIdRef.current ? 'own' : ''}`}
-                            >
-                                <div className="message-user">{msg.user}</div>
-                                <div className="message-text">{msg.text}</div>
-                            </div>
-                        ))}
-                        <div ref={messagesEndRef} />
-                    </div>
-                    <div className="input-container">
-                        <input
-                            type="text"
-                            className="message-input"
-                            placeholder="メッセージを入力..."
-                            maxLength={200}
-                            value={messageInput}
-                            onChange={(e) => setMessageInput(e.target.value)}
-                            onKeyPress={handleKeyPress}
-                        />
-                        <button className="send-button" onClick={handleSendMessage}>
-                            送信
-                        </button>
-                    </div>
-                </div>
-
-                {Array.from(cursors.entries()).map(([userId, data]) => (
-                    <div
-                        key={userId}
-                        className="cursor"
-                        style={{
-                            left: `${data.x}px`,
-                            top: `${data.y}px`,
-                            backgroundColor: data.color,
+        <div
+            className={`chat-container ${isCollapsed ? 'collapsed' : ''}`}
+            onClick={isCollapsed ? () => setIsCollapsed(false) : undefined}
+            style={{ cursor: isCollapsed ? 'pointer' : 'default' }}
+        >
+            <div className="chat-header">
+                <span><i className="fa-jelly fa-regular fa-comment-dots"></i> {roomId}</span>
+                <span className="online-count"><i className="fa-solid fa-user"></i> {onlineCount}人</span>
+                <button
+                    className="collapse-button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsCollapsed(!isCollapsed);
+                    }}
+                    title={isCollapsed ? 'チャットを展開' : 'チャットを折りたたむ'}
+                >
+                    <i className={`fa-solid ${isCollapsed ? 'fa-chevron-right' : 'fa-chevron-left'}`}></i>
+                </button>
+                {onClose && (
+                    <button
+                        className="close-button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onClose();
                         }}
-                        data-user={data.user}
-                    />
+                        title="チャットを閉じる"
+                    >
+                        Close
+                    </button>
+                )}
+            </div>
+            <div className="messages">
+                {messages.map((msg, index) => (
+                    <div
+                        key={index}
+                        className={`message ${msg.userId === myUserIdRef.current ? 'own' : ''}`}
+                    >
+                        <div className="message-user">{msg.user}</div>
+                        <div className="message-text">{msg.text}</div>
+                    </div>
                 ))}
+                <div ref={messagesEndRef} />
+            </div>
+            <div className="input-container">
+                <input
+                    type="text"
+                    className="message-input"
+                    placeholder="メッセージを入力..."
+                    maxLength={200}
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                />
+                <button className="send-button" onClick={handleSendMessage}>
+                    送信
+                </button>
             </div>
         </div>
     );

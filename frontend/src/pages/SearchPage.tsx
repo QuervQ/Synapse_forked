@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
 import { searchGoogle, SearchResult } from '../lib/search';
 import { supabase } from '../lib/supabase';
+import ChatInterface from '../components/ChatInterface';
 import '../styles/SearchPage.css';
 
 interface GoogleAppsIconProps {
@@ -18,9 +19,9 @@ const GoogleAppsIcon: React.FC<GoogleAppsIconProps> = ({
     color = 'currentColor'
 }) => {
     return (
-    <svg
-        className={className}
-        focusable="false"
+        <svg
+            className={className}
+            focusable="false"
             viewBox="0 0 24 24"
             width={size}
             height={size}
@@ -32,7 +33,8 @@ const GoogleAppsIcon: React.FC<GoogleAppsIconProps> = ({
 };
 
 export default function SearchPage() {
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeRoomId = searchParams.get('v');
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
     const [results, setResults] = useState<SearchResult[]>([]);
@@ -50,6 +52,10 @@ export default function SearchPage() {
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [settingsName, setSettingsName] = useState('');
     const [settingsAvatarUrl, setSettingsAvatarUrl] = useState('');
+    const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+        const savedTheme = localStorage.getItem('theme');
+        return (savedTheme === 'dark' || savedTheme === 'light') ? savedTheme : 'light';
+    });
 
     useEffect(() => {
         const query = searchParams.get('q');
@@ -136,10 +142,14 @@ export default function SearchPage() {
         }
     };
 
-    const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
+    const handleSearch = (e: React.FormEvent<HTMLFormElement>): void => {
         e.preventDefault();
         if (searchQuery.trim()) {
-            navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+            const params: Record<string, string> = { q: searchQuery };
+            if (activeRoomId) {
+                params.v = activeRoomId;
+            }
+            setSearchParams(params);
         }
     };
 
@@ -175,7 +185,8 @@ export default function SearchPage() {
             { room_id: roomId, user_id: user.id, role: 'member' }
         ]);
 
-        window.location.href = `/room/${roomId}`;
+        setSearchParams({ q: searchParams.get('q') || '', v: roomId });
+        setShowRoomModal(false);
     };
 
     const loadUserProfile = async (user: any) => {
@@ -206,11 +217,24 @@ export default function SearchPage() {
     };
 
     const apps = [
-        { name: 'Chat', icon: '/images/icon.png' },
+        { name: 'Chat', icon: '/images/icon.png', action: () => setShowRoomModal(true) },
     ];
 
     return (
-        <div className="search-page-container">
+        <div className={`search-page-container ${theme === 'dark' ? 'dark-mode' : ''} ${activeRoomId ? 'with-sidebar' : ''}`}>
+
+            {/* Sidebar Chat Interface */}
+            {activeRoomId && (
+                <div className="sidebar-chat">
+                    <ChatInterface
+                        roomId={activeRoomId}
+                        onClose={() => {
+                            setSearchParams({ q: searchParams.get('q') || '' });
+                        }}
+                    />
+                </div>
+            )}
+
             {/* ヘッダー */}
             <header className="search-page-header">
                 <div className="header-content">
@@ -250,7 +274,7 @@ export default function SearchPage() {
                             <div className="apps-dropdown" style={{ width: `${Math.min(apps.length, 3) * 80}px` }}>
                                 <div className="apps-grid" style={{ gridTemplateColumns: `repeat(${Math.min(apps.length, 3)}, 1fr)` }}>
                                     {apps.map((app, index) => (
-                                        <div key={index} className="app-item" onClick={() => setShowRoomModal(true)}>
+                                        <div key={index} className="app-item" onClick={app.action}>
                                             <div className="app-icon-wrapper">
                                                 <img src={app.icon} alt={app.name} className="app-icon" />
                                             </div>
