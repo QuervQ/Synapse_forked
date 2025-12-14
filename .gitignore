@@ -11,3 +11,6 @@ wheels/
 node_modules
 node_modules/
 vite.config.ts
+Dockerfile
+docker-compose.yml
+.dockerignore
